@@ -3,7 +3,7 @@
 	"changelog": [
 		"@changesets/changelog-github",
 		{
-			"repo": "ascorbic/library-template"
+			"repo": "ascorbic/atproto-worker"
 		}
 	],
 	"commit": false,

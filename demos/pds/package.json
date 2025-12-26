@@ -1,16 +1,16 @@
 {
-	"name": "@demo/example",
+	"name": "@demo/pds",
 	"version": "1.0.0",
-	"description": "",
+	"description": "Demo PDS deployment",
 	"main": "index.js",
 	"private": true,
 	"dependencies": {
-		"@ascorbic/example": "workspace:^"
+		"@ascorbic/pds-worker": "workspace:^"
 	},
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"keywords": [],
-	"author": "",
+	"author": "Matt Kane",
 	"license": "MIT"
 }

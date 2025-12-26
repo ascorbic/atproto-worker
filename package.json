@@ -1,8 +1,8 @@
 {
-	"name": "@ascorbic/workspace",
+	"name": "atproto-worker",
 	"private": true,
 	"version": "1.0.0",
-	"description": "",
+	"description": "AT Protocol PDS on Cloudflare Workers",
 	"scripts": {
 		"check": "pnpm run --filter @ascorbic/* check",
 		"test": "pnpm run --filter @ascorbic/* test",

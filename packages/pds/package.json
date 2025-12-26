@@ -1,0 +1,33 @@
+{
+	"name": "@ascorbic/pds-worker",
+	"version": "0.0.0",
+	"description": "AT Protocol PDS on Cloudflare Workers",
+	"type": "module",
+	"main": "dist/index.js",
+	"files": ["dist"],
+	"exports": {
+		".": "./dist/index.js"
+	},
+	"scripts": {
+		"build": "tsdown src/index.ts --format esm --dts --clean",
+		"dev": "tsdown src/index.ts --format esm --dts --watch",
+		"prepublishOnly": "node --run build",
+		"check": "publint && attw --pack --ignore-rules=cjs-resolves-to-esm",
+		"test": "vitest"
+	},
+	"devDependencies": {
+		"@arethetypeswrong/cli": "^0.18.2",
+		"publint": "^0.3.16",
+		"tsdown": "^0.18.3",
+		"typescript": "^5.9.3"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ascorbic/atproto-worker.git",
+		"directory": "packages/pds"
+	},
+	"homepage": "https://github.com/ascorbic/atproto-worker",
+	"keywords": ["atproto", "bluesky", "pds", "cloudflare-workers"],
+	"author": "Matt Kane",
+	"license": "MIT"
+}

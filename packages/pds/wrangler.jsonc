@@ -5,6 +5,14 @@
 	"compatibility_date": "2024-09-23",
 	"compatibility_flags": ["nodejs_compat"],
 
+	// Custom domain routing (auto-provisions DNS)
+	"routes": [
+		{
+			"pattern": "pds.mk.gg",
+			"custom_domain": true
+		}
+	],
+
 	// Durable Object bindings
 	"durable_objects": {
 		"bindings": [
@@ -23,7 +31,7 @@
 		}
 	],
 
-	// R2 bucket for blob storage (enable R2 in dashboard first)
+	// R2 bucket for blob storage (enable R2 in dashboard, then uncomment)
 	// "r2_buckets": [
 	// 	{
 	// 		"binding": "BLOBS",

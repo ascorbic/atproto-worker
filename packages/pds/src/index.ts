@@ -7,6 +7,39 @@ export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url)
 
+		// DID document for did:web resolution
+		if (url.pathname === "/.well-known/did.json") {
+			const didDocument = {
+				"@context": [
+					"https://www.w3.org/ns/did/v1",
+					"https://w3id.org/security/multikey/v1",
+					"https://w3id.org/security/suites/secp256k1-2019/v1",
+				],
+				id: env.DID,
+				verificationMethod: [
+					{
+						id: `${env.DID}#atproto`,
+						type: "Multikey",
+						controller: env.DID,
+						publicKeyMultibase: env.SIGNING_KEY_PUBLIC,
+					},
+				],
+				service: [
+					{
+						id: "#atproto_pds",
+						type: "AtprotoPersonalDataServer",
+						serviceEndpoint: `https://${env.PDS_HOSTNAME}`,
+					},
+				],
+			}
+			return new Response(JSON.stringify(didDocument, null, 2), {
+				headers: {
+					"Content-Type": "application/json",
+					"Access-Control-Allow-Origin": "*",
+				},
+			})
+		}
+
 		// Route to Account DO for XRPC endpoints
 		if (url.pathname.startsWith("/xrpc/")) {
 			const id = env.ACCOUNT.idFromName("account")

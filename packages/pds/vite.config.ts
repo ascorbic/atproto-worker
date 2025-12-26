@@ -1,7 +1,11 @@
-import { defineConfig } from "vite"
-import { cloudflare } from "@cloudflare/vite-plugin"
+import { defineConfig } from "vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
 
-// Vite config for dev and build - testing uses vitest.config.ts
 export default defineConfig({
 	plugins: [cloudflare()],
-})
+	resolve: {
+		alias: {
+			pino: "pino/browser.js",
+		},
+	},
+});

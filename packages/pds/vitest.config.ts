@@ -1,5 +1,5 @@
-import { defineConfig } from "vitest/config"
-import { cloudflareTest } from "@cloudflare/vitest-pool-workers"
+import { defineConfig } from "vitest/config";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 
 export default defineConfig({
 	plugins: [
@@ -11,17 +11,19 @@ export default defineConfig({
 					HANDLE: "alice.test",
 					PDS_HOSTNAME: "pds.test",
 					AUTH_TOKEN: "test-token",
-					SIGNING_KEY: "e5b452e70de7fb7864fdd7f0d67c6dbd0f128413a1daa1b2b8a871e906fc90cc",
-					SIGNING_KEY_PUBLIC: "zQ3shbUq6umkAhwsxEXj6fRZ3ptBtF5CNZbAGoKjvFRatUkVY",
+					SIGNING_KEY:
+						"e5b452e70de7fb7864fdd7f0d67c6dbd0f128413a1daa1b2b8a871e906fc90cc",
+					SIGNING_KEY_PUBLIC:
+						"zQ3shbUq6umkAhwsxEXj6fRZ3ptBtF5CNZbAGoKjvFRatUkVY",
 				},
 			},
 		}),
 	],
 	resolve: {
-		conditions: ["node", "require"],
-	},
-	optimizeDeps: {
-		include: ["multiformats/cid", "@atproto/repo", "@atproto/lex-data", "@atproto/lex-cbor"],
+		conditions: ["worker", "browser", "node", "require"],
+		alias: {
+			pino: "pino/browser.js",
+		},
 	},
 	test: {
 		globals: true,
@@ -29,4 +31,4 @@ export default defineConfig({
 		maxWorkers: 1,
 		isolate: false,
 	},
-})
+});

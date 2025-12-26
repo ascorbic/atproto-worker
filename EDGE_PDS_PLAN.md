@@ -12,22 +12,26 @@ Build a single-user AT Protocol Personal Data Server (PDS) on Cloudflare Workers
 
 **Live at: https://pds.mk.gg**
 
-### Completed (Phase 1-2 + Partial Phase 6)
+### Completed (Phase 1 + Partial Phase 6)
 
-- ✅ **Storage Layer** - `SqliteRepoStorage` implementing `@atproto/repo` RepoStorage interface
-- ✅ **Durable Object** - `AccountDurableObject` with SQLite schema initialization
-- ✅ **DID Document** - Served at `/.well-known/did.json` for did:web resolution
+- ✅ **Storage Layer** (Phase 1) - `SqliteRepoStorage` implementing `@atproto/repo` RepoStorage interface
+- ✅ **Durable Object Skeleton** (Phase 2 partial) - `AccountDurableObject` with SQLite schema initialization
+- ✅ **DID Document** (Phase 6 partial) - Served at `/.well-known/did.json` for did:web resolution
 - ✅ **Health Check** - `/health` endpoint
 - ✅ **Deployment** - Custom domain `pds.mk.gg` with auto-provisioned DNS
 - ✅ **Signing Keys** - secp256k1 keypair generated and configured
-- ✅ **Testing** - vitest-pool-workers with 16 passing tests
+- ✅ **Testing** - vitest-pool-workers with 16 passing tests for storage layer
 
 ### In Progress
 
-- 🔄 **XRPC Endpoints** (Phase 3) - Router and core endpoints
+- 🔄 **Repo Integration** (Phase 2) - Integrate `@atproto/repo` Repo class with AccountDurableObject
+  - Need to load signing key from env
+  - Create or load Repo instance using SqliteRepoStorage
+  - Expose repo methods for XRPC endpoints to call
 
 ### Not Started
 
+- ⬜ **XRPC Endpoints** (Phase 3) - Router and core endpoints (blocked on Repo integration)
 - ⬜ **Firehose** (Phase 4) - WebSocket subscribeRepos
 - ⬜ **Blob Storage** (Phase 5) - R2 integration (R2 needs enabling in dashboard)
 - ⬜ **Authentication** (Phase 7) - Bearer token middleware

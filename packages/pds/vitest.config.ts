@@ -1,24 +1,32 @@
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config"
+import { defineConfig } from "vitest/config"
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers"
 
-export default defineWorkersConfig({
-	test: {
-		globals: true,
-		poolOptions: {
-			workers: {
-				singleWorker: true,
-				isolatedStorage: false, // Disable isolated storage - DO tests manage their own isolation
-				wrangler: { configPath: "./wrangler.jsonc" },
-				miniflare: {
-					bindings: {
-						DID: "did:web:pds.test",
-						HANDLE: "alice.test",
-						PDS_HOSTNAME: "pds.test",
-						AUTH_TOKEN: "test-token",
-						SIGNING_KEY: "test-signing-key",
-						SIGNING_KEY_PUBLIC: "test-signing-key-public",
-					},
+export default defineConfig({
+	plugins: [
+		cloudflareTest({
+			wrangler: { configPath: "./wrangler.jsonc" },
+			miniflare: {
+				bindings: {
+					DID: "did:web:pds.test",
+					HANDLE: "alice.test",
+					PDS_HOSTNAME: "pds.test",
+					AUTH_TOKEN: "test-token",
+					SIGNING_KEY: "e5b452e70de7fb7864fdd7f0d67c6dbd0f128413a1daa1b2b8a871e906fc90cc",
+					SIGNING_KEY_PUBLIC: "zQ3shbUq6umkAhwsxEXj6fRZ3ptBtF5CNZbAGoKjvFRatUkVY",
 				},
 			},
-		},
+		}),
+	],
+	resolve: {
+		conditions: ["node", "require"],
+	},
+	optimizeDeps: {
+		include: ["multiformats/cid", "@atproto/repo", "@atproto/lex-data", "@atproto/lex-cbor"],
+	},
+	test: {
+		globals: true,
+		// Vitest 4: singleWorker is now maxWorkers: 1, isolate: false
+		maxWorkers: 1,
+		isolate: false,
 	},
 })

@@ -332,4 +332,37 @@ describe("AccountDurableObject", () => {
 			expect(storage).toBeInstanceOf(SqliteRepoStorage)
 		})
 	})
+
+	it("creates a new repo on first access", async () => {
+		const id = env.ACCOUNT.newUniqueId()
+		const stub = env.ACCOUNT.get(id)
+
+		await runInDurableObject(stub, async (instance: AccountDurableObject) => {
+			const repo = await instance.getRepo()
+			expect(repo).toBeDefined()
+			expect(repo.did).toBe(env.DID)
+			expect(repo.cid).toBeDefined()
+		})
+	})
+
+	it("loads existing repo from storage", async () => {
+		const id = env.ACCOUNT.idFromName("persistent-test")
+		const stub = env.ACCOUNT.get(id)
+
+		let firstRepoCid: string
+
+		// First access - create repo
+		await runInDurableObject(stub, async (instance: AccountDurableObject) => {
+			const repo = await instance.getRepo()
+			firstRepoCid = repo.cid.toString()
+			expect(repo.did).toBe(env.DID)
+		})
+
+		// Second access to same DO - should load existing repo
+		await runInDurableObject(stub, async (instance: AccountDurableObject) => {
+			const repo = await instance.getRepo()
+			expect(repo.cid.toString()).toBe(firstRepoCid)
+			expect(repo.did).toBe(env.DID)
+		})
+	})
 })

@@ -22,21 +22,21 @@
 		"@atproto/crypto": "^0.4.5",
 		"@atproto/repo": "^0.8.12",
 		"@atproto/syntax": "^0.4.2",
-		"@ipld/dag-cbor": "^9.2.5",
+		"@ipld/dag-cbor": "^7.0.0",
 		"cborg": "^4.3.2",
-		"multiformats": "^13.4.2",
-		"uint8arrays": "^5.1.0"
+		"multiformats": "^9.9.0",
+		"uint8arrays": "3.0.0"
 	},
 	"devDependencies": {
 		"@arethetypeswrong/cli": "^0.18.2",
 		"@cloudflare/vite-plugin": "^1.17.0",
-		"@cloudflare/vitest-pool-workers": "^0.11.1",
+		"@cloudflare/vitest-pool-workers": "https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632",
 		"@cloudflare/workers-types": "^4.20251225.0",
 		"publint": "^0.3.16",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"vite": "^6.0.0",
-		"vitest": "~3.2.0",
+		"vitest": "^4.0.0",
 		"wrangler": "^4.54.0"
 	},
 	"repository": {

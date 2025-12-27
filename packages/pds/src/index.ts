@@ -46,7 +46,7 @@ const app = new Hono<{ Bindings: Env }>();
 app.use("*", cors({
 	origin: "*",
 	allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-	allowHeaders: ["Content-Type", "Authorization"],
+	allowHeaders: ["Content-Type", "Authorization", "atproto-accept-labelers", "atproto-proxy"],
 	exposeHeaders: ["Content-Type"],
 	maxAge: 86400,
 }));

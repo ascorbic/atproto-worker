@@ -377,6 +377,94 @@ export class AccountDurableObject extends DurableObject<Env> {
 	}
 
 	/**
+	 * RPC method: Put a record (create or update)
+	 */
+	async rpcPutRecord(
+		collection: string,
+		rkey: string,
+		record: unknown,
+	): Promise<{
+		uri: string;
+		cid: string;
+		commit: { cid: string; rev: string };
+		validationStatus: string;
+	}> {
+		const repo = await this.getRepo();
+		const keypair = await this.getKeypair();
+
+		// Check if record exists to determine create vs update
+		const existing = await repo.getRecord(collection, rkey);
+		const isUpdate = existing !== null;
+
+		const op: RecordWriteOp = isUpdate
+			? ({
+					action: WriteOpAction.Update,
+					collection,
+					rkey,
+					record: record as RepoRecord,
+				} as RecordUpdateOp)
+			: ({
+					action: WriteOpAction.Create,
+					collection,
+					rkey,
+					record: record as RepoRecord,
+				} as RecordCreateOp);
+
+		const prevRev = repo.commit.rev;
+		const updatedRepo = await repo.applyWrites([op], keypair);
+		this.repo = updatedRepo;
+
+		// Get the CID for the record from the MST
+		const dataKey = `${collection}/${rkey}`;
+		const recordCid = await this.repo.data.get(dataKey);
+
+		if (!recordCid) {
+			throw new Error(`Failed to put record: ${collection}/${rkey}`);
+		}
+
+		// Sequence the commit for firehose
+		if (this.sequencer) {
+			const newBlocks = new BlockMap();
+			const rows = this.ctx.storage.sql
+				.exec(
+					"SELECT cid, bytes FROM blocks WHERE rev = ?",
+					this.repo.commit.rev,
+				)
+				.toArray();
+
+			for (const row of rows) {
+				const cid = CID.parse(row.cid as string);
+				const bytes = new Uint8Array(row.bytes as ArrayBuffer);
+				newBlocks.set(cid, bytes);
+			}
+
+			const opWithCid = { ...op, cid: recordCid };
+
+			const commitData: CommitData = {
+				did: this.repo.did,
+				commit: this.repo.cid,
+				rev: this.repo.commit.rev,
+				since: prevRev,
+				newBlocks,
+				ops: [opWithCid],
+			};
+
+			const event = await this.sequencer.sequenceCommit(commitData);
+			await this.broadcastCommit(event);
+		}
+
+		return {
+			uri: AtUri.make(this.repo.did, collection, rkey).toString(),
+			cid: recordCid.toString(),
+			commit: {
+				cid: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
+			},
+			validationStatus: "valid",
+		};
+	}
+
+	/**
 	 * RPC method: Apply multiple writes (batch create/update/delete)
 	 */
 	async rpcApplyWrites(

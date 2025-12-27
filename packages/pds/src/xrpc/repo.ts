@@ -253,6 +253,47 @@ export async function deleteRecord(
 	return c.json(result);
 }
 
+export async function putRecord(
+	c: Context<{ Bindings: Env }>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	const body = await c.req.json();
+	const { repo, collection, rkey, record } = body;
+
+	if (!repo || !collection || !rkey || !record) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Missing required parameters: repo, collection, rkey, record",
+			},
+			400,
+		);
+	}
+
+	if (repo !== c.env.DID) {
+		return c.json(
+			{
+				error: "InvalidRepo",
+				message: `Invalid repository: ${repo}`,
+			},
+			400,
+		);
+	}
+
+	try {
+		const result = await accountDO.rpcPutRecord(collection, rkey, record);
+		return c.json(result);
+	} catch (err) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: err instanceof Error ? err.message : String(err),
+			},
+			400,
+		);
+	}
+}
+
 export async function applyWrites(
 	c: Context<{ Bindings: Env }>,
 	accountDO: DurableObjectStub<AccountDurableObject>,

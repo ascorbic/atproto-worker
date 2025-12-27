@@ -292,7 +292,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			const commitData: CommitData = {
 				did: this.repo.did,
 				commit: this.repo.cid,
-				rev: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
 				since: prevCid.toString(),
 				newBlocks,
 				ops: [createOp],
@@ -310,7 +310,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 					tooBig: false,
 					repo: this.repo.did,
 					commit: this.repo.cid,
-					rev: this.repo.cid.toString(),
+					rev: this.repo.commit.rev,
 					since: prevCid.toString(),
 					blocks: new Uint8Array(), // Will be filled by sequencer
 					ops: [
@@ -334,7 +334,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			cid: recordCid.toString(),
 			commit: {
 				cid: this.repo.cid.toString(),
-				rev: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
 			},
 		};
 	}
@@ -382,7 +382,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			const commitData: CommitData = {
 				did: this.repo.did,
 				commit: this.repo.cid,
-				rev: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
 				since: prevCid.toString(),
 				newBlocks,
 				ops: [deleteOp],
@@ -400,7 +400,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 					tooBig: false,
 					repo: this.repo.did,
 					commit: this.repo.cid,
-					rev: this.repo.cid.toString(),
+					rev: this.repo.commit.rev,
 					since: prevCid.toString(),
 					blocks: new Uint8Array(), // Will be filled by sequencer
 					ops: [
@@ -422,7 +422,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 		return {
 			commit: {
 				cid: updatedRepo.cid.toString(),
-				rev: updatedRepo.cid.toString(),
+				rev: updatedRepo.commit.rev,
 			},
 		};
 	}
@@ -564,7 +564,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			const commitData: CommitData = {
 				did: this.repo.did,
 				commit: this.repo.cid,
-				rev: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
 				since: prevCid.toString(),
 				newBlocks,
 				ops,
@@ -601,7 +601,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 					tooBig: false,
 					repo: this.repo.did,
 					commit: this.repo.cid,
-					rev: this.repo.cid.toString(),
+					rev: this.repo.commit.rev,
 					since: prevCid.toString(),
 					blocks: new Uint8Array(),
 					ops: firehoseOps as any,
@@ -617,7 +617,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 		return {
 			commit: {
 				cid: this.repo.cid.toString(),
-				rev: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
 			},
 			results: finalResults,
 		};
@@ -633,7 +633,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 		const repo = await this.getRepo();
 		return {
 			did: repo.did,
-			rev: repo.cid.toString(),
+			rev: repo.commit.rev,
 		};
 	}
 

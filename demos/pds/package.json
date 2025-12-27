@@ -2,13 +2,18 @@
 	"name": "@demo/pds",
 	"version": "1.0.0",
 	"description": "Demo PDS deployment",
-	"main": "index.js",
+	"type": "module",
 	"private": true,
 	"dependencies": {
 		"@ascorbic/pds-worker": "workspace:^"
 	},
+	"devDependencies": {
+		"wrangler": "^4.54.0"
+	},
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"setup": "node ../../scripts/setup-pds.js"
 	},
 	"keywords": [],
 	"author": "Matt Kane",

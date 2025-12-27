@@ -87,6 +87,7 @@ app.get("/.well-known/did.json", (c) => {
 			"https://w3id.org/security/suites/secp256k1-2019/v1",
 		],
 		id: c.env.DID,
+		alsoKnownAs: [`at://${c.env.HANDLE}`],
 		verificationMethod: [
 			{
 				id: `${c.env.DID}#atproto`,
@@ -104,6 +105,13 @@ app.get("/.well-known/did.json", (c) => {
 		],
 	};
 	return c.json(didDocument);
+});
+
+// Handle verification for AT Protocol
+app.get("/.well-known/atproto-did", (c) => {
+	return new Response(c.env.DID, {
+		headers: { "Content-Type": "text/plain" },
+	});
 });
 
 // Health check
@@ -210,6 +218,13 @@ app.get("/xrpc/app.bsky.ageassurance.getState", requireAuth, (c) => {
 			accountCreatedAt: new Date().toISOString(),
 		},
 	});
+});
+
+// Admin: Emit identity event to refresh handle verification
+app.post("/admin/emit-identity", requireAuth, async (c) => {
+	const accountDO = getAccountDO(c.env);
+	const result = await accountDO.rpcEmitIdentityEvent(c.env.HANDLE);
+	return c.json(result);
 });
 
 // Proxy unhandled XRPC requests to Bluesky services

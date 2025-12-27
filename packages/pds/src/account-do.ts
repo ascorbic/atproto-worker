@@ -771,6 +771,52 @@ export class AccountDurableObject extends DurableObject<Env> {
 	}
 
 	/**
+	 * Emit an identity event to notify downstream services to refresh identity cache.
+	 */
+	async rpcEmitIdentityEvent(handle: string): Promise<{ seq: number }> {
+		await this.ensureStorageInitialized();
+
+		const time = new Date().toISOString();
+
+		// Get next sequence number
+		const result = this.ctx.storage.sql
+			.exec(
+				`INSERT INTO firehose_events (event_type, payload)
+				 VALUES ('identity', ?)
+				 RETURNING seq`,
+				new Uint8Array(0), // Empty payload, we just need seq
+			)
+			.one();
+		const seq = result.seq as number;
+
+		// Build identity event frame
+		const header = { op: 1, t: "#identity" };
+		const body = {
+			seq,
+			did: this.env.DID,
+			time,
+			handle,
+		};
+
+		const headerBytes = cborEncode(header as unknown as import("@atproto/lex-cbor").LexValue);
+		const bodyBytes = cborEncode(body as unknown as import("@atproto/lex-cbor").LexValue);
+		const frame = new Uint8Array(headerBytes.length + bodyBytes.length);
+		frame.set(headerBytes, 0);
+		frame.set(bodyBytes, headerBytes.length);
+
+		// Broadcast to all connected clients
+		for (const ws of this.ctx.getWebSockets()) {
+			try {
+				ws.send(frame);
+			} catch (e) {
+				console.error("Error broadcasting identity event:", e);
+			}
+		}
+
+		return { seq };
+	}
+
+	/**
 	 * HTTP fetch handler for WebSocket upgrades.
 	 * This is used instead of RPC to avoid WebSocket serialization errors.
 	 */

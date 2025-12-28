@@ -215,6 +215,13 @@ app.get("/xrpc/com.atproto.server.getAccountStatus", requireAuth, (c) =>
 	server.getAccountStatus(c, getAccountDO(c.env)),
 );
 
+// Service auth - used by clients to get JWTs for external services (video, etc.)
+app.get(
+	"/xrpc/com.atproto.server.getServiceAuth",
+	requireAuth,
+	server.getServiceAuth,
+);
+
 // Actor preferences (stub - returns empty preferences)
 app.get("/xrpc/app.bsky.actor.getPreferences", requireAuth, (c) => {
 	return c.json({ preferences: [] });

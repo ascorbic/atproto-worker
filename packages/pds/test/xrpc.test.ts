@@ -968,6 +968,86 @@ describe("XRPC Endpoints", () => {
 		});
 	});
 
+	describe("Service Auth", () => {
+		it("should return service JWT for video upload", async () => {
+			const response = await worker.fetch(
+				new Request(
+					"http://pds.test/xrpc/com.atproto.server.getServiceAuth?aud=did:web:video.bsky.app&lxm=app.bsky.video.getUploadLimits",
+					{
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
+					},
+				),
+				env,
+			);
+			expect(response.status).toBe(200);
+
+			const data = (await response.json()) as { token: string };
+			expect(data.token).toBeDefined();
+
+			// Verify JWT structure
+			const parts = data.token.split(".");
+			expect(parts).toHaveLength(3);
+
+			// Decode and verify payload
+			const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+			expect(payload.iss).toBe(env.DID);
+			expect(payload.aud).toBe("did:web:video.bsky.app");
+			expect(payload.lxm).toBe("app.bsky.video.getUploadLimits");
+			expect(payload.iat).toBeTypeOf("number");
+			expect(payload.exp).toBeTypeOf("number");
+		});
+
+		it("should return service JWT without lxm", async () => {
+			const response = await worker.fetch(
+				new Request(
+					"http://pds.test/xrpc/com.atproto.server.getServiceAuth?aud=did:web:api.bsky.app",
+					{
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
+					},
+				),
+				env,
+			);
+			expect(response.status).toBe(200);
+
+			const data = (await response.json()) as { token: string };
+			const parts = data.token.split(".");
+			const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+			expect(payload.lxm).toBeUndefined();
+		});
+
+		it("should require authentication", async () => {
+			const response = await worker.fetch(
+				new Request(
+					"http://pds.test/xrpc/com.atproto.server.getServiceAuth?aud=did:web:video.bsky.app",
+				),
+				env,
+			);
+			expect(response.status).toBe(401);
+		});
+
+		it("should require aud parameter", async () => {
+			const response = await worker.fetch(
+				new Request(
+					"http://pds.test/xrpc/com.atproto.server.getServiceAuth",
+					{
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
+					},
+				),
+				env,
+			);
+			expect(response.status).toBe(400);
+
+			const data = (await response.json()) as { error: string };
+			expect(data.error).toBe("InvalidRequest");
+		});
+	});
+
 	describe("Sync Endpoints", () => {
 		it("should get repo status", async () => {
 			const response = await worker.fetch(

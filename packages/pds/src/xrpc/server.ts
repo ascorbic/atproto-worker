@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { Secp256k1Keypair } from "@atproto/crypto";
 import type { AccountDurableObject } from "../account-do";
 import {
 	createAccessToken,
@@ -7,6 +8,7 @@ import {
 	verifyAccessToken,
 	verifyRefreshToken,
 } from "../session";
+import { createServiceJwt } from "../service-auth";
 import type { AppEnv, AuthedAppEnv } from "../types";
 
 export async function describeServer(c: Context<AppEnv>): Promise<Response> {
@@ -256,4 +258,45 @@ export async function getAccountStatus(
 			importedBlobs: null,
 		});
 	}
+}
+
+// Lazy-loaded keypair for service auth
+let keypairPromise: Promise<Secp256k1Keypair> | null = null;
+function getKeypair(signingKey: string): Promise<Secp256k1Keypair> {
+	if (!keypairPromise) {
+		keypairPromise = Secp256k1Keypair.import(signingKey);
+	}
+	return keypairPromise;
+}
+
+/**
+ * Get a service auth token for communicating with external services.
+ * Used by clients to get JWTs for services like video.bsky.app.
+ */
+export async function getServiceAuth(
+	c: Context<AuthedAppEnv>,
+): Promise<Response> {
+	const aud = c.req.query("aud");
+	const lxm = c.req.query("lxm") || null;
+
+	if (!aud) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Missing required parameter: aud",
+			},
+			400,
+		);
+	}
+
+	// Create service JWT for the requested audience
+	const keypair = await getKeypair(c.env.SIGNING_KEY);
+	const token = await createServiceJwt({
+		iss: c.env.DID,
+		aud,
+		lxm,
+		keypair,
+	});
+
+	return c.json({ token });
 }

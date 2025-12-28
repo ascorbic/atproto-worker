@@ -4,6 +4,7 @@ import {
 	WriteOpAction,
 	BlockMap,
 	blocksToCarFile,
+	readCarWithRoot,
 	type RecordCreateOp,
 	type RecordUpdateOp,
 	type RecordDeleteOp,
@@ -669,6 +670,56 @@ export class AccountDurableObject extends DurableObject<Env> {
 
 		// Use the official CAR builder
 		return blocksToCarFile(root, blocks);
+	}
+
+	/**
+	 * RPC method: Import repo from CAR file
+	 * This is used for account migration - importing an existing repository
+	 * from another PDS.
+	 */
+	async rpcImportRepo(carBytes: Uint8Array): Promise<{
+		did: string;
+		rev: string;
+		cid: string;
+	}> {
+		await this.ensureStorageInitialized();
+
+		// Check if repo already exists
+		const existingRoot = await this.storage!.getRoot();
+		if (existingRoot) {
+			throw new Error(
+				"Repository already exists. Cannot import over existing repository.",
+			);
+		}
+
+		// Use official @atproto/repo utilities to read and validate CAR
+		// readCarWithRoot validates single root requirement and returns BlockMap
+		const { root: rootCid, blocks } = await readCarWithRoot(carBytes);
+
+		// Import all blocks into storage using putMany (more efficient than individual putBlock)
+		const importRev = TID.nextStr();
+		await this.storage!.putMany(blocks, importRev);
+
+		// Load the repo to verify it's valid and get the actual revision
+		this.keypair = await Secp256k1Keypair.import(this.env.SIGNING_KEY);
+		this.repo = await Repo.load(this.storage!, rootCid);
+
+		// Verify the DID matches to prevent incorrect migrations
+		if (this.repo.did !== this.env.DID) {
+			// Clean up imported blocks
+			await this.storage!.destroy();
+			throw new Error(
+				`DID mismatch: CAR file contains DID ${this.repo.did}, but expected ${this.env.DID}`,
+			);
+		}
+
+		this.repoInitialized = true;
+
+		return {
+			did: this.repo.did,
+			rev: this.repo.commit.rev,
+			cid: rootCid.toString(),
+		};
 	}
 
 	/**

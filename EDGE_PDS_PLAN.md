@@ -47,13 +47,15 @@ Build a single-user AT Protocol Personal Data Server (PDS) on Cloudflare Workers
   - `com.atproto.sync.getBlob` endpoint (public read access)
   - Direct R2 access in endpoint (R2ObjectBody cannot be serialized across RPC)
   - Blobs stored with DID prefix for isolation
-- ✅ **Testing** - Migrated to vitest 4, all 81 tests passing
+- ✅ **Testing** - Migrated to vitest 4, all 101 tests passing
   - 16 storage tests
-  - 26 XRPC tests (auth, concurrency, error handling, CAR validation)
-  - 6 firehose tests (event sequencing, cursor validation, backfill)
+  - 32 XRPC tests (auth, concurrency, error handling, CAR validation)
+  - 8 firehose tests (event sequencing, cursor validation, backfill)
   - 10 blob tests (upload, retrieval, size limits, content types)
   - 15 session tests (login, refresh, getSession, JWT validation)
   - 8 validation tests (optimistic mode, strict mode, schema enforcement)
+  - 9 migration tests (account status, import/export, validation)
+  - 3 Bluesky validation tests (post creation, profile updates, schema compliance)
 - ✅ **TypeScript** - All diagnostic errors resolved, proper type declarations for cloudflare:test
 - ✅ **Protocol Helpers** - All protocol operations use official @atproto utilities
   - Record keys: `TID.nextStr()` from `@atproto/common-web`
@@ -82,6 +84,14 @@ Build a single-user AT Protocol Personal Data Server (PDS) on Cloudflare Workers
   - Integrated into `createRecord`, `putRecord`, and `applyWrites` endpoints
   - Schemas can be added dynamically via `validator.addSchema()`
   - 8 validation tests covering optimistic mode, strict mode, and schema enforcement
+- ✅ **Account Migration** (Phase 9) - Import/export for PDS migration
+  - `com.atproto.repo.importRepo` - Import repository from CAR file (authenticated, 100MB limit)
+  - `com.atproto.server.getAccountStatus` - Get account status for migration planning
+  - CAR file import using `readCarWithRoot()` from `@atproto/repo`
+  - Validates DID matches during import to prevent incorrect migrations
+  - Prevents importing over existing repository data
+  - Complete export/import workflow tested with CAR file validation
+  - 9 comprehensive migration tests
 
 ### Not Started
 
@@ -2026,11 +2036,10 @@ wrangler secret put PASSWORD_HASH # Generate: npx bcryptjs hash "your-password"
 
 - Account creation / multi-user
 - OAuth / third-party app auth
-- Account migration
 - Labelling
 - Email verification
 - Rate limiting
-- Admin endpoints
+- Advanced admin endpoints
 
 These can all be added later.
 

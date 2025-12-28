@@ -1,6 +1,22 @@
 import type { Context } from "hono";
 import { AtUri, ensureValidDid } from "@atproto/syntax";
 import { AccountDurableObject } from "../account-do";
+import { validator } from "../validation";
+
+function invalidRecordError(
+	c: Context<{ Bindings: Env }>,
+	err: unknown,
+	prefix?: string,
+): Response {
+	const message = err instanceof Error ? err.message : String(err);
+	return c.json(
+		{
+			error: "InvalidRecord",
+			message: prefix ? `${prefix}: ${message}` : message,
+		},
+		400,
+	);
+}
 
 export async function describeRepo(
 	c: Context<{ Bindings: Env }>,
@@ -206,6 +222,13 @@ export async function createRecord(
 		);
 	}
 
+	// Validate record against lexicon schema
+	try {
+		validator.validateRecord(collection, record);
+	} catch (err) {
+		return invalidRecordError(c, err);
+	}
+
 	const result = await accountDO.rpcCreateRecord(collection, rkey, record);
 
 	return c.json(result);
@@ -251,4 +274,242 @@ export async function deleteRecord(
 	}
 
 	return c.json(result);
+}
+
+export async function putRecord(
+	c: Context<{ Bindings: Env }>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	const body = await c.req.json();
+	const { repo, collection, rkey, record } = body;
+
+	if (!repo || !collection || !rkey || !record) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Missing required parameters: repo, collection, rkey, record",
+			},
+			400,
+		);
+	}
+
+	if (repo !== c.env.DID) {
+		return c.json(
+			{
+				error: "InvalidRepo",
+				message: `Invalid repository: ${repo}`,
+			},
+			400,
+		);
+	}
+
+	// Validate record against lexicon schema
+	try {
+		validator.validateRecord(collection, record);
+	} catch (err) {
+		return invalidRecordError(c, err);
+	}
+
+	try {
+		const result = await accountDO.rpcPutRecord(collection, rkey, record);
+		return c.json(result);
+	} catch (err) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: err instanceof Error ? err.message : String(err),
+			},
+			400,
+		);
+	}
+}
+
+export async function applyWrites(
+	c: Context<{ Bindings: Env }>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	const body = await c.req.json();
+	const { repo, writes } = body;
+
+	if (!repo || !writes || !Array.isArray(writes)) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Missing required parameters: repo, writes",
+			},
+			400,
+		);
+	}
+
+	if (repo !== c.env.DID) {
+		return c.json(
+			{
+				error: "InvalidRepo",
+				message: `Invalid repository: ${repo}`,
+			},
+			400,
+		);
+	}
+
+	if (writes.length > 200) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Too many writes. Max: 200",
+			},
+			400,
+		);
+	}
+
+	// Validate all records in create and update operations
+	for (let i = 0; i < writes.length; i++) {
+		const write = writes[i];
+		if (
+			write.$type === "com.atproto.repo.applyWrites#create" ||
+			write.$type === "com.atproto.repo.applyWrites#update"
+		) {
+			try {
+				validator.validateRecord(write.collection, write.value);
+			} catch (err) {
+				return invalidRecordError(c, err, `Write ${i}`);
+			}
+		}
+	}
+
+	try {
+		const result = await accountDO.rpcApplyWrites(writes);
+		return c.json(result);
+	} catch (err) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: err instanceof Error ? err.message : String(err),
+			},
+			400,
+		);
+	}
+}
+
+export async function uploadBlob(
+	c: Context<{ Bindings: Env }>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	const contentType =
+		c.req.header("Content-Type") || "application/octet-stream";
+	const bytes = new Uint8Array(await c.req.arrayBuffer());
+
+	// Size limit check (5MB)
+	const MAX_BLOB_SIZE = 5 * 1024 * 1024;
+	if (bytes.length > MAX_BLOB_SIZE) {
+		return c.json(
+			{
+				error: "BlobTooLarge",
+				message: `Blob size ${bytes.length} exceeds maximum of ${MAX_BLOB_SIZE} bytes`,
+			},
+			400,
+		);
+	}
+
+	try {
+		const blobRef = await accountDO.rpcUploadBlob(bytes, contentType);
+		return c.json({ blob: blobRef });
+	} catch (err) {
+		if (
+			err instanceof Error &&
+			err.message.includes("Blob storage not configured")
+		) {
+			return c.json(
+				{
+					error: "ServiceUnavailable",
+					message: "Blob storage is not configured",
+				},
+				503,
+			);
+		}
+		throw err;
+	}
+}
+
+export async function importRepo(
+	c: Context<{ Bindings: Env }>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	const contentType = c.req.header("Content-Type");
+
+	// Verify content type
+	if (contentType !== "application/vnd.ipld.car") {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message:
+					"Content-Type must be application/vnd.ipld.car for repository import",
+			},
+			400,
+		);
+	}
+
+	// Get CAR file bytes
+	const carBytes = new Uint8Array(await c.req.arrayBuffer());
+
+	if (carBytes.length === 0) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Empty CAR file",
+			},
+			400,
+		);
+	}
+
+	// Size limit check (100MB for repo imports)
+	const MAX_CAR_SIZE = 100 * 1024 * 1024;
+	if (carBytes.length > MAX_CAR_SIZE) {
+		return c.json(
+			{
+				error: "RepoTooLarge",
+				message: `Repository size ${carBytes.length} exceeds maximum of ${MAX_CAR_SIZE} bytes`,
+			},
+			400,
+		);
+	}
+
+	try {
+		const result = await accountDO.rpcImportRepo(carBytes);
+		return c.json(result);
+	} catch (err) {
+		if (err instanceof Error) {
+			if (err.message.includes("already exists")) {
+				return c.json(
+					{
+						error: "RepoAlreadyExists",
+						message: "Repository already exists. Cannot import over existing data.",
+					},
+					409,
+				);
+			}
+			if (err.message.includes("DID mismatch")) {
+				return c.json(
+					{
+						error: "InvalidRepo",
+						message: err.message,
+					},
+					400,
+				);
+			}
+			if (
+				err.message.includes("no roots") ||
+				err.message.includes("no blocks") ||
+				err.message.includes("Invalid root")
+			) {
+				return c.json(
+					{
+						error: "InvalidRepo",
+						message: `Invalid CAR file: ${err.message}`,
+					},
+					400,
+				);
+			}
+		}
+		throw err;
+	}
 }

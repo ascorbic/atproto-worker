@@ -4,8 +4,11 @@ import {
 	WriteOpAction,
 	BlockMap,
 	blocksToCarFile,
+	readCarWithRoot,
 	type RecordCreateOp,
+	type RecordUpdateOp,
 	type RecordDeleteOp,
+	type RecordWriteOp,
 } from "@atproto/repo";
 import type { RepoRecord } from "@atproto/lexicon";
 import { Secp256k1Keypair } from "@atproto/crypto";
@@ -15,6 +18,7 @@ import { AtUri } from "@atproto/syntax";
 import { encode as cborEncode } from "@atproto/lex-cbor";
 import { SqliteRepoStorage } from "./storage";
 import { Sequencer, type SeqEvent, type CommitData } from "./sequencer";
+import { BlobStore, type BlobRef } from "./blobs";
 
 /**
  * Account Durable Object - manages a single user's AT Protocol repository.
@@ -30,6 +34,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 	private repo: Repo | null = null;
 	private keypair: Secp256k1Keypair | null = null;
 	private sequencer: Sequencer | null = null;
+	private blobStore: BlobStore | null = null;
 	private storageInitialized = false;
 	private repoInitialized = false;
 
@@ -42,6 +47,11 @@ export class AccountDurableObject extends DurableObject<Env> {
 		}
 		if (!env.DID) {
 			throw new Error("Missing required environment variable: DID");
+		}
+
+		// Initialize BlobStore if R2 bucket is available
+		if (env.BLOBS) {
+			this.blobStore = new BlobStore(env.BLOBS, env.DID);
 		}
 	}
 
@@ -242,7 +252,6 @@ export class AccountDurableObject extends DurableObject<Env> {
 	}> {
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
-		const storage = await this.getStorage();
 
 		const actualRkey = rkey || TID.nextStr();
 		const createOp: RecordCreateOp = {
@@ -252,7 +261,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			record: record as RepoRecord,
 		};
 
-		const prevCid = repo.cid;
+		const prevRev = repo.commit.rev;
 		const updatedRepo = await repo.applyWrites([createOp], keypair);
 		this.repo = updatedRepo;
 
@@ -271,7 +280,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			const rows = this.ctx.storage.sql
 				.exec(
 					"SELECT cid, bytes FROM blocks WHERE rev = ?",
-					this.repo.cid.toString(),
+					this.repo.commit.rev,
 				)
 				.toArray();
 
@@ -281,43 +290,19 @@ export class AccountDurableObject extends DurableObject<Env> {
 				newBlocks.set(cid, bytes);
 			}
 
+			// Include the record CID in the op for the firehose
+			const opWithCid = { ...createOp, cid: recordCid };
+
 			const commitData: CommitData = {
 				did: this.repo.did,
 				commit: this.repo.cid,
-				rev: this.repo.cid.toString(),
-				since: prevCid.toString(),
+				rev: this.repo.commit.rev,
+				since: prevRev,
 				newBlocks,
-				ops: [createOp],
+				ops: [opWithCid],
 			};
 
-			const seq = await this.sequencer.sequenceCommit(commitData);
-
-			// Broadcast to connected firehose clients
-			const event: SeqEvent = {
-				seq,
-				type: "commit",
-				event: {
-					seq,
-					rebase: false,
-					tooBig: false,
-					repo: this.repo.did,
-					commit: this.repo.cid,
-					rev: this.repo.cid.toString(),
-					since: prevCid.toString(),
-					blocks: new Uint8Array(), // Will be filled by sequencer
-					ops: [
-						{
-							action: "create",
-							path: `${collection}/${actualRkey}`,
-							cid: recordCid,
-						},
-					],
-					blobs: [],
-					time: new Date().toISOString(),
-				},
-				time: new Date().toISOString(),
-			};
-
+			const event = await this.sequencer.sequenceCommit(commitData);
 			await this.broadcastCommit(event);
 		}
 
@@ -326,7 +311,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			cid: recordCid.toString(),
 			commit: {
 				cid: this.repo.cid.toString(),
-				rev: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
 			},
 		};
 	}
@@ -350,7 +335,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			rkey,
 		};
 
-		const prevCid = repo.cid;
+		const prevRev = repo.commit.rev;
 		const updatedRepo = await repo.applyWrites([deleteOp], keypair);
 		this.repo = updatedRepo;
 
@@ -361,7 +346,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 			const rows = this.ctx.storage.sql
 				.exec(
 					"SELECT cid, bytes FROM blocks WHERE rev = ?",
-					this.repo.cid.toString(),
+					this.repo.commit.rev,
 				)
 				.toArray();
 
@@ -374,48 +359,272 @@ export class AccountDurableObject extends DurableObject<Env> {
 			const commitData: CommitData = {
 				did: this.repo.did,
 				commit: this.repo.cid,
-				rev: this.repo.cid.toString(),
-				since: prevCid.toString(),
+				rev: this.repo.commit.rev,
+				since: prevRev,
 				newBlocks,
 				ops: [deleteOp],
 			};
 
-			const seq = await this.sequencer.sequenceCommit(commitData);
-
-			// Broadcast to connected firehose clients
-			const event: SeqEvent = {
-				seq,
-				type: "commit",
-				event: {
-					seq,
-					rebase: false,
-					tooBig: false,
-					repo: this.repo.did,
-					commit: this.repo.cid,
-					rev: this.repo.cid.toString(),
-					since: prevCid.toString(),
-					blocks: new Uint8Array(), // Will be filled by sequencer
-					ops: [
-						{
-							action: "delete",
-							path: `${collection}/${rkey}`,
-							cid: null,
-						},
-					],
-					blobs: [],
-					time: new Date().toISOString(),
-				},
-				time: new Date().toISOString(),
-			};
-
+			const event = await this.sequencer.sequenceCommit(commitData);
 			await this.broadcastCommit(event);
 		}
 
 		return {
 			commit: {
 				cid: updatedRepo.cid.toString(),
-				rev: updatedRepo.cid.toString(),
+				rev: updatedRepo.commit.rev,
 			},
+		};
+	}
+
+	/**
+	 * RPC method: Put a record (create or update)
+	 */
+	async rpcPutRecord(
+		collection: string,
+		rkey: string,
+		record: unknown,
+	): Promise<{
+		uri: string;
+		cid: string;
+		commit: { cid: string; rev: string };
+		validationStatus: string;
+	}> {
+		const repo = await this.getRepo();
+		const keypair = await this.getKeypair();
+
+		// Check if record exists to determine create vs update
+		const existing = await repo.getRecord(collection, rkey);
+		const isUpdate = existing !== null;
+
+		const op: RecordWriteOp = isUpdate
+			? ({
+					action: WriteOpAction.Update,
+					collection,
+					rkey,
+					record: record as RepoRecord,
+				} as RecordUpdateOp)
+			: ({
+					action: WriteOpAction.Create,
+					collection,
+					rkey,
+					record: record as RepoRecord,
+				} as RecordCreateOp);
+
+		const prevRev = repo.commit.rev;
+		const updatedRepo = await repo.applyWrites([op], keypair);
+		this.repo = updatedRepo;
+
+		// Get the CID for the record from the MST
+		const dataKey = `${collection}/${rkey}`;
+		const recordCid = await this.repo.data.get(dataKey);
+
+		if (!recordCid) {
+			throw new Error(`Failed to put record: ${collection}/${rkey}`);
+		}
+
+		// Sequence the commit for firehose
+		if (this.sequencer) {
+			const newBlocks = new BlockMap();
+			const rows = this.ctx.storage.sql
+				.exec(
+					"SELECT cid, bytes FROM blocks WHERE rev = ?",
+					this.repo.commit.rev,
+				)
+				.toArray();
+
+			for (const row of rows) {
+				const cid = CID.parse(row.cid as string);
+				const bytes = new Uint8Array(row.bytes as ArrayBuffer);
+				newBlocks.set(cid, bytes);
+			}
+
+			const opWithCid = { ...op, cid: recordCid };
+
+			const commitData: CommitData = {
+				did: this.repo.did,
+				commit: this.repo.cid,
+				rev: this.repo.commit.rev,
+				since: prevRev,
+				newBlocks,
+				ops: [opWithCid],
+			};
+
+			const event = await this.sequencer.sequenceCommit(commitData);
+			await this.broadcastCommit(event);
+		}
+
+		return {
+			uri: AtUri.make(this.repo.did, collection, rkey).toString(),
+			cid: recordCid.toString(),
+			commit: {
+				cid: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
+			},
+			validationStatus: "valid",
+		};
+	}
+
+	/**
+	 * RPC method: Apply multiple writes (batch create/update/delete)
+	 */
+	async rpcApplyWrites(
+		writes: Array<{
+			$type: string;
+			collection: string;
+			rkey?: string;
+			value?: unknown;
+		}>,
+	): Promise<{
+		commit: { cid: string; rev: string };
+		results: Array<{
+			$type: string;
+			uri?: string;
+			cid?: string;
+			validationStatus?: string;
+		}>;
+	}> {
+		const repo = await this.getRepo();
+		const keypair = await this.getKeypair();
+
+		// Convert input writes to RecordWriteOp format
+		const ops: RecordWriteOp[] = [];
+		const results: Array<{
+			$type: string;
+			uri?: string;
+			cid?: string;
+			validationStatus?: string;
+			collection: string;
+			rkey: string;
+			action: WriteOpAction;
+		}> = [];
+
+		for (const write of writes) {
+			if (write.$type === "com.atproto.repo.applyWrites#create") {
+				const rkey = write.rkey || TID.nextStr();
+				const op: RecordCreateOp = {
+					action: WriteOpAction.Create,
+					collection: write.collection,
+					rkey,
+					record: write.value as RepoRecord,
+				};
+				ops.push(op);
+				results.push({
+					$type: "com.atproto.repo.applyWrites#createResult",
+					collection: write.collection,
+					rkey,
+					action: WriteOpAction.Create,
+				});
+			} else if (write.$type === "com.atproto.repo.applyWrites#update") {
+				if (!write.rkey) {
+					throw new Error("Update requires rkey");
+				}
+				const op: RecordUpdateOp = {
+					action: WriteOpAction.Update,
+					collection: write.collection,
+					rkey: write.rkey,
+					record: write.value as RepoRecord,
+				};
+				ops.push(op);
+				results.push({
+					$type: "com.atproto.repo.applyWrites#updateResult",
+					collection: write.collection,
+					rkey: write.rkey,
+					action: WriteOpAction.Update,
+				});
+			} else if (write.$type === "com.atproto.repo.applyWrites#delete") {
+				if (!write.rkey) {
+					throw new Error("Delete requires rkey");
+				}
+				const op: RecordDeleteOp = {
+					action: WriteOpAction.Delete,
+					collection: write.collection,
+					rkey: write.rkey,
+				};
+				ops.push(op);
+				results.push({
+					$type: "com.atproto.repo.applyWrites#deleteResult",
+					collection: write.collection,
+					rkey: write.rkey,
+					action: WriteOpAction.Delete,
+				});
+			} else {
+				throw new Error(`Unknown write type: ${write.$type}`);
+			}
+		}
+
+		const prevRev = repo.commit.rev;
+		const updatedRepo = await repo.applyWrites(ops, keypair);
+		this.repo = updatedRepo;
+
+		// Build final results with CIDs and prepare ops with CIDs for firehose
+		const finalResults: Array<{
+			$type: string;
+			uri?: string;
+			cid?: string;
+			validationStatus?: string;
+		}> = [];
+		const opsWithCids: Array<RecordWriteOp & { cid?: CID | null }> = [];
+
+		for (let i = 0; i < results.length; i++) {
+			const result = results[i]!;
+			const op = ops[i]!;
+
+			if (result.action === WriteOpAction.Delete) {
+				finalResults.push({
+					$type: result.$type,
+				});
+				opsWithCids.push(op);
+			} else {
+				// Get the CID for create/update
+				const dataKey = `${result.collection}/${result.rkey}`;
+				const recordCid = await this.repo.data.get(dataKey);
+				finalResults.push({
+					$type: result.$type,
+					uri: AtUri.make(this.repo.did, result.collection, result.rkey).toString(),
+					cid: recordCid?.toString(),
+					validationStatus: "valid",
+				});
+				// Include the record CID in the op for the firehose
+				opsWithCids.push({ ...op, cid: recordCid });
+			}
+		}
+
+		// Sequence the commit for firehose
+		if (this.sequencer) {
+			const newBlocks = new BlockMap();
+			const rows = this.ctx.storage.sql
+				.exec(
+					"SELECT cid, bytes FROM blocks WHERE rev = ?",
+					this.repo.commit.rev,
+				)
+				.toArray();
+
+			for (const row of rows) {
+				const cid = CID.parse(row.cid as string);
+				const bytes = new Uint8Array(row.bytes as ArrayBuffer);
+				newBlocks.set(cid, bytes);
+			}
+
+			const commitData: CommitData = {
+				did: this.repo.did,
+				commit: this.repo.cid,
+				rev: this.repo.commit.rev,
+				since: prevRev,
+				newBlocks,
+				ops: opsWithCids,
+			};
+
+			const event = await this.sequencer.sequenceCommit(commitData);
+			await this.broadcastCommit(event);
+		}
+
+		return {
+			commit: {
+				cid: this.repo.cid.toString(),
+				rev: this.repo.commit.rev,
+			},
+			results: finalResults,
 		};
 	}
 
@@ -424,12 +633,14 @@ export class AccountDurableObject extends DurableObject<Env> {
 	 */
 	async rpcGetRepoStatus(): Promise<{
 		did: string;
+		head: string;
 		rev: string;
 	}> {
 		const repo = await this.getRepo();
 		return {
 			did: repo.did,
-			rev: repo.cid.toString(),
+			head: repo.cid.toString(),
+			rev: repo.commit.rev,
 		};
 	}
 
@@ -459,6 +670,87 @@ export class AccountDurableObject extends DurableObject<Env> {
 
 		// Use the official CAR builder
 		return blocksToCarFile(root, blocks);
+	}
+
+	/**
+	 * RPC method: Import repo from CAR file
+	 * This is used for account migration - importing an existing repository
+	 * from another PDS.
+	 */
+	async rpcImportRepo(carBytes: Uint8Array): Promise<{
+		did: string;
+		rev: string;
+		cid: string;
+	}> {
+		await this.ensureStorageInitialized();
+
+		// Check if repo already exists
+		const existingRoot = await this.storage!.getRoot();
+		if (existingRoot) {
+			throw new Error(
+				"Repository already exists. Cannot import over existing repository.",
+			);
+		}
+
+		// Use official @atproto/repo utilities to read and validate CAR
+		// readCarWithRoot validates single root requirement and returns BlockMap
+		const { root: rootCid, blocks } = await readCarWithRoot(carBytes);
+
+		// Import all blocks into storage using putMany (more efficient than individual putBlock)
+		const importRev = TID.nextStr();
+		await this.storage!.putMany(blocks, importRev);
+
+		// Load the repo to verify it's valid and get the actual revision
+		this.keypair = await Secp256k1Keypair.import(this.env.SIGNING_KEY);
+		this.repo = await Repo.load(this.storage!, rootCid);
+
+		// Verify the DID matches to prevent incorrect migrations
+		if (this.repo.did !== this.env.DID) {
+			// Clean up imported blocks
+			await this.storage!.destroy();
+			throw new Error(
+				`DID mismatch: CAR file contains DID ${this.repo.did}, but expected ${this.env.DID}`,
+			);
+		}
+
+		this.repoInitialized = true;
+
+		return {
+			did: this.repo.did,
+			rev: this.repo.commit.rev,
+			cid: rootCid.toString(),
+		};
+	}
+
+	/**
+	 * RPC method: Upload a blob to R2
+	 */
+	async rpcUploadBlob(bytes: Uint8Array, mimeType: string): Promise<BlobRef> {
+		if (!this.blobStore) {
+			throw new Error("Blob storage not configured");
+		}
+
+		// Enforce size limit (5MB)
+		const MAX_BLOB_SIZE = 5 * 1024 * 1024;
+		if (bytes.length > MAX_BLOB_SIZE) {
+			throw new Error(
+				`Blob too large: ${bytes.length} bytes (max ${MAX_BLOB_SIZE})`,
+			);
+		}
+
+		return this.blobStore.putBlob(bytes, mimeType);
+	}
+
+	/**
+	 * RPC method: Get a blob from R2
+	 */
+	async rpcGetBlob(cidStr: string): Promise<R2ObjectBody | null> {
+		if (!this.blobStore) {
+			throw new Error("Blob storage not configured");
+		}
+
+		const cid = CID.parse(cidStr);
+		return this.blobStore.getBlob(cid);
 	}
 
 	/**
@@ -495,10 +787,7 @@ export class AccountDurableObject extends DurableObject<Env> {
 	/**
 	 * Backfill firehose events from a cursor.
 	 */
-	private async backfillFirehose(
-		ws: WebSocket,
-		cursor: number,
-	): Promise<void> {
+	private async backfillFirehose(ws: WebSocket, cursor: number): Promise<void> {
 		if (!this.sequencer) {
 			throw new Error("Sequencer not initialized");
 		}
@@ -594,7 +883,10 @@ export class AccountDurableObject extends DurableObject<Env> {
 	/**
 	 * WebSocket message handler (hibernation API).
 	 */
-	override webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer): void {
+	override webSocketMessage(
+		_ws: WebSocket,
+		_message: string | ArrayBuffer,
+	): void {
 		// Firehose is server-push only, ignore client messages
 	}
 
@@ -615,6 +907,52 @@ export class AccountDurableObject extends DurableObject<Env> {
 	 */
 	override webSocketError(_ws: WebSocket, error: Error): void {
 		console.error("WebSocket error:", error);
+	}
+
+	/**
+	 * Emit an identity event to notify downstream services to refresh identity cache.
+	 */
+	async rpcEmitIdentityEvent(handle: string): Promise<{ seq: number }> {
+		await this.ensureStorageInitialized();
+
+		const time = new Date().toISOString();
+
+		// Get next sequence number
+		const result = this.ctx.storage.sql
+			.exec(
+				`INSERT INTO firehose_events (event_type, payload)
+				 VALUES ('identity', ?)
+				 RETURNING seq`,
+				new Uint8Array(0), // Empty payload, we just need seq
+			)
+			.one();
+		const seq = result.seq as number;
+
+		// Build identity event frame
+		const header = { op: 1, t: "#identity" };
+		const body = {
+			seq,
+			did: this.env.DID,
+			time,
+			handle,
+		};
+
+		const headerBytes = cborEncode(header as unknown as import("@atproto/lex-cbor").LexValue);
+		const bodyBytes = cborEncode(body as unknown as import("@atproto/lex-cbor").LexValue);
+		const frame = new Uint8Array(headerBytes.length + bodyBytes.length);
+		frame.set(headerBytes, 0);
+		frame.set(bodyBytes, headerBytes.length);
+
+		// Broadcast to all connected clients
+		for (const ws of this.ctx.getWebSockets()) {
+			try {
+				ws.send(frame);
+			} catch (e) {
+				console.error("Error broadcasting identity event:", e);
+			}
+		}
+
+		return { seq };
 	}
 
 	/**

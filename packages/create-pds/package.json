@@ -1,0 +1,40 @@
+{
+	"name": "create-pds",
+	"version": "0.0.0",
+	"description": "Create a new AT Protocol PDS on Cloudflare Workers",
+	"type": "module",
+	"bin": {
+		"create-pds": "./dist/index.js"
+	},
+	"files": [
+		"dist",
+		"templates"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"test": "vitest run",
+		"check": "publint"
+	},
+	"devDependencies": {
+		"@clack/prompts": "^0.11.0",
+		"@types/node": "^24.10.4",
+		"citty": "^0.1.6",
+		"publint": "^0.3.16",
+		"tsdown": "^0.18.3",
+		"typescript": "^5.9.3"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ascorbic/atproto-worker.git",
+		"directory": "packages/create-pds"
+	},
+	"homepage": "https://github.com/ascorbic/atproto-worker",
+	"keywords": [
+		"atproto",
+		"bluesky",
+		"pds",
+		"cloudflare-workers"
+	],
+	"author": "Matt Kane",
+	"license": "MIT"
+}

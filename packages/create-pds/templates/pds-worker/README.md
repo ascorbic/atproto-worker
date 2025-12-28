@@ -1,6 +1,6 @@
 # Personal PDS on Cloudflare Workers
 
-This is an example deployment of `@ascorbic/pds-worker` - a single-user AT Protocol Personal Data Server on Cloudflare Workers.
+A single-user AT Protocol Personal Data Server running on Cloudflare Workers.
 
 > **⚠️ Experimental Software**
 >
@@ -16,13 +16,16 @@ pnpm install
 
 ### 2. Configure environment
 
-Use the PDS CLI to generate keys and configure your local dev environment:
+If you haven't already, run the setup wizard:
 
 ```bash
 pnpm pds init
+# or
+npm run pds init
+yarn pds init
 ```
 
-This will prompt for your hostname, handle, and password, then write configuration to `.dev.vars`.
+This prompts for your hostname, handle, and password, then writes configuration to `.dev.vars`.
 
 ### 3. Run locally
 
@@ -30,25 +33,21 @@ This will prompt for your hostname, handle, and password, then write configurati
 pnpm dev
 ```
 
-This starts a local development server using Miniflare with your `.dev.vars` configuration.
+This starts a local development server at http://localhost:5173.
 
 ### 4. Deploy to production
 
-Use the PDS CLI to configure for production:
+First configure for production:
 
 ```bash
-pnpm pds init
+pnpm pds init --production
+
+# or
+npm run pds init --production
+yarn pds init --production
 ```
 
 This sets vars in `wrangler.jsonc` and secrets via `wrangler secret put`.
-
-Or configure secrets individually:
-
-```bash
-pnpm pds secret key      # Generate signing keypair
-pnpm pds secret jwt      # Generate JWT secret
-pnpm pds secret password # Set login password
-```
 
 Then deploy:
 
@@ -58,7 +57,7 @@ pnpm run deploy
 
 ## Configuration
 
-Configuration is via environment variables: vars in the `wrangler.jsonc` and secrets. Use `pnpm pds init` to configure interactively.
+Configuration uses environment variables: vars in `wrangler.jsonc` and secrets.
 
 **Vars (in wrangler.jsonc):**
 
@@ -74,20 +73,9 @@ Configuration is via environment variables: vars in the `wrangler.jsonc` and sec
 - `JWT_SECRET` - Secret for signing session JWTs
 - `PASSWORD_HASH` - Bcrypt hash of account password (for Bluesky app login)
 
-## Architecture
-
-This deployment simply re-exports the `@ascorbic/pds-worker` package:
-
-```typescript
-// src/index.ts
-export { default, AccountDurableObject } from "@ascorbic/pds-worker";
-```
-
-No additional code needed!
-
 ## Endpoints
 
-Once deployed, your PDS will serve:
+Once deployed, your PDS serves:
 
 - `GET /.well-known/did.json` - DID document
 - `GET /health` - Health check
@@ -101,3 +89,4 @@ Once deployed, your PDS will serve:
 
 - [AT Protocol Docs](https://atproto.com)
 - [Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)
+- [@ascorbic/pds-worker on GitHub](https://github.com/ascorbic/atproto-worker)

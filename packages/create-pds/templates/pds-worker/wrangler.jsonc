@@ -1,5 +1,5 @@
 {
-	// Demo PDS Deployment
+	// AT Protocol PDS on Cloudflare Workers
 	// Run `pnpm pds init` to configure, or `pnpm pds init --production` to deploy secrets
 	"name": "atproto-pds",
 	"main": "src/index.ts",
@@ -25,22 +25,22 @@
 			]
 		}
 	],
-	// R2 bucket for blob storage
+	// R2 bucket for blob storage (optional - create via Cloudflare dashboard)
 	"r2_buckets": [
 		{
 			"binding": "BLOBS",
 			"bucket_name": "pds-blobs"
-		},
+		}
 	],
 	// Environment variables (public config)
 	// These are set by `pds init` or can be edited manually
 	"vars": {
 		// Public hostname of the PDS (e.g., "pds.example.com")
-		"PDS_HOSTNAME": "pds.mk.gg",
+		"PDS_HOSTNAME": "",
 		// Account DID - usually did:web:<hostname>
-		"DID": "did:web:pds.mk.gg",
+		"DID": "",
 		// Account handle (e.g., "alice.example.com")
-		"HANDLE": "pds.mk.gg"
+		"HANDLE": ""
 	}
 	// Secrets (set via `pds init` or `pds secret <name>`):
 	// - AUTH_TOKEN: Bearer token for API write operations

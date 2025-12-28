@@ -1,9 +1,6 @@
 import { CID } from "@atproto/lex-data";
 import { BlockMap, type CommitData } from "@atproto/repo";
-import {
-	ReadableBlockstore,
-	type RepoStorage,
-} from "@atproto/repo/dist/storage";
+import { ReadableBlockstore, type RepoStorage } from "@atproto/repo";
 
 /**
  * SQLite-backed repository storage for Cloudflare Durable Objects.

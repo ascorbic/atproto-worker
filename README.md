@@ -2,6 +2,10 @@
 
 A single-user AT Protocol Personal Data Server (PDS) running on Cloudflare Workers with Durable Objects.
 
+> **⚠️ Experimental Software**
+>
+> This is an early-stage project under active development. **Do not migrate your main Bluesky account to this PDS yet.** Use a test account or create a new identity for experimentation. Data loss, breaking changes, and missing features are expected.
+
 ## Overview
 
 This PDS is designed to federate with the Bluesky network - relays can sync from it, and AppViews can read from it.

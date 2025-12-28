@@ -52,6 +52,9 @@
 		"url": "git+https://github.com/ascorbic/atproto-worker.git",
 		"directory": "packages/pds"
 	},
+	"peerDependencies": {
+		"wrangler": "^4.54.0"
+	},
 	"homepage": "https://github.com/ascorbic/atproto-worker",
 	"keywords": [
 		"atproto",

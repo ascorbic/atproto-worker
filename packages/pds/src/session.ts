@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify, decodeJwt, type JWTPayload } from "jose";
+import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { compare } from "bcryptjs";
 
 const ACCESS_TOKEN_LIFETIME = "2h";

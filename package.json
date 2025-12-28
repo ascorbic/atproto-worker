@@ -4,9 +4,9 @@
 	"version": "1.0.0",
 	"description": "AT Protocol PDS on Cloudflare Workers",
 	"scripts": {
-		"check": "pnpm run --filter @ascorbic/* check",
-		"test": "pnpm run --filter @ascorbic/* test",
-		"build": "pnpm run --filter @ascorbic/* build",
+		"check": "pnpm run --filter '@ascorbic/*' --filter 'create-pds' check",
+		"test": "pnpm run --filter '@ascorbic/*' --filter 'create-pds' test",
+		"build": "pnpm run --filter '@ascorbic/*' --filter 'create-pds' build",
 		"format": "prettier --write ."
 	},
 	"keywords": [],

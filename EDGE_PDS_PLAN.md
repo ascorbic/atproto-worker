@@ -108,6 +108,49 @@ Build a single-user AT Protocol Personal Data Server (PDS) on Cloudflare Workers
 
 - None! All planned phases are complete.
 
+### Future Work: did:plc Migration Support
+
+Account migration is now possible from bsky.social. To support users migrating their existing `did:plc` accounts to this PDS, we need to implement the full migration flow.
+
+**Migration Flow (4 phases):**
+
+1. **Account Creation** - New PDS creates account in "deactivated" state with existing DID
+2. **Data Migration** - Export repo as CAR, import to new PDS, migrate blobs
+3. **Identity Update** - Old PDS signs PLC operation, new PDS submits to plc.directory
+4. **Finalization** - Activate on new PDS, deactivate on old
+
+**Endpoints needed for incoming migration:**
+
+| Endpoint                                            | Status | Purpose                               |
+| --------------------------------------------------- | ------ | ------------------------------------- |
+| `com.atproto.server.createAccount`                  | ❌     | Create account with existing DID      |
+| `com.atproto.identity.getRecommendedDidCredentials` | ❌     | Provide DID params for PLC operation  |
+| `com.atproto.identity.submitPlcOperation`           | ❌     | Submit signed PLC op to plc.directory |
+| `com.atproto.server.activateAccount`                | ❌     | Activate migrated account             |
+| `com.atproto.repo.listMissingBlobs`                 | ❌     | Check which blobs need migration      |
+
+**Endpoints needed for outgoing migration:**
+
+| Endpoint                                            | Status | Purpose                                   |
+| --------------------------------------------------- | ------ | ----------------------------------------- |
+| `com.atproto.server.getServiceAuth`                 | ❌     | Generate service auth token for migration |
+| `com.atproto.identity.requestPlcOperationSignature` | ❌     | Request email verification token          |
+| `com.atproto.identity.signPlcOperation`             | ❌     | Sign PLC operation with rotation key      |
+| `com.atproto.server.deactivateAccount`              | ❌     | Deactivate account after migration        |
+
+**Already implemented:**
+
+- ✅ `com.atproto.sync.getRepo` - Export repository as CAR
+- ✅ `com.atproto.repo.importRepo` - Import repository from CAR
+- ✅ `com.atproto.sync.listBlobs` - List blobs for migration
+- ✅ `com.atproto.server.getAccountStatus` - Check account status
+
+**References:**
+
+- [Account Migration - AT Protocol](https://atproto.com/guides/account-migration)
+- [Account Migration Details Discussion](https://github.com/bluesky-social/atproto/discussions/3176)
+- [Enabling Account Migration Back to Bluesky's PDS](https://docs.bsky.app/blog/incoming-migration)
+
 ### Testing & Development Notes
 
 **Vitest 4 Migration**: Successfully migrated to vitest 4 with `@cloudflare/vitest-pool-workers` PR build (#11632). This required:
@@ -195,7 +238,7 @@ for (const [cidStr, bytes] of internalMap) { ... }
 | ----------------- | --------------------------------------- |
 | OAuth Provider    | Complex, not needed for single-user MVP |
 | Rate Limiting     | Single user, not needed for MVP         |
-| Account Migration | Complex, post-MVP feature               |
+| did:plc Migration | Complex - see "Future Work" section     |
 | Labelling         | AppView concern, not PDS                |
 
 ---
@@ -2064,6 +2107,7 @@ wrangler secret put PASSWORD_HASH # Generate: npx bcryptjs hash "your-password"
 - Email verification
 - Rate limiting
 - Advanced admin endpoints
+- Full did:plc migration (partial support exists - see "Future Work" section)
 
 These can all be added later.
 

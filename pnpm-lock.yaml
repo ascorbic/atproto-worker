@@ -32,13 +32,34 @@ importers:
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.17.0
-        version: 1.17.0(vite@6.4.1(@types/node@24.10.4)(tsx@4.21.0))(workerd@1.20251219.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))
+        version: 1.17.0(vite@6.4.1(@types/node@24.10.4)(tsx@4.21.0))(workerd@1.20251210.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))
       vite:
         specifier: ^6.4.1
         version: 6.4.1(@types/node@24.10.4)(tsx@4.21.0)
       wrangler:
         specifier: ^4.54.0
         version: 4.54.0(@cloudflare/workers-types@4.20251225.0)
+
+  packages/create-pds:
+    devDependencies:
+      '@clack/prompts':
+        specifier: ^0.11.0
+        version: 0.11.0
+      '@types/node':
+        specifier: ^24.10.4
+        version: 24.10.4
+      citty:
+        specifier: ^0.1.6
+        version: 0.1.6
+      publint:
+        specifier: ^0.3.16
+        version: 0.3.16
+      tsdown:
+        specifier: ^0.18.3
+        version: 0.18.3(@arethetypeswrong/core@0.18.2)(publint@0.3.16)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/pds:
     dependencies:
@@ -2708,21 +2729,15 @@ snapshots:
     optionalDependencies:
       workerd: 1.20251210.0
 
-  '@cloudflare/unenv-preset@2.7.13(unenv@2.0.0-rc.24)(workerd@1.20251219.0)':
-    dependencies:
-      unenv: 2.0.0-rc.24
-    optionalDependencies:
-      workerd: 1.20251219.0
-
   '@cloudflare/unenv-preset@https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/unenv-preset@64982d4(unenv@2.0.0-rc.24)(workerd@1.20251219.0)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
       workerd: 1.20251219.0
 
-  '@cloudflare/vite-plugin@1.17.0(vite@6.4.1(@types/node@24.10.4)(tsx@4.21.0))(workerd@1.20251219.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))':
+  '@cloudflare/vite-plugin@1.17.0(vite@6.4.1(@types/node@24.10.4)(tsx@4.21.0))(workerd@1.20251210.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))':
     dependencies:
-      '@cloudflare/unenv-preset': 2.7.13(unenv@2.0.0-rc.24)(workerd@1.20251219.0)
+      '@cloudflare/unenv-preset': 2.7.13(unenv@2.0.0-rc.24)(workerd@1.20251210.0)
       '@remix-run/node-fetch-server': 0.8.1
       defu: 6.1.4
       get-port: 7.1.0

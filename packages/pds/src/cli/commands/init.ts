@@ -7,7 +7,12 @@ import { spawn } from "node:child_process";
 import * as p from "@clack/prompts";
 import { Secp256k1Keypair } from "@atproto/crypto";
 import bcrypt from "bcryptjs";
-import { setSecret, setVars, getVars } from "../utils/wrangler.js";
+import {
+	setSecret,
+	setVars,
+	getVars,
+	type SecretName,
+} from "../utils/wrangler.js";
 import { readDevVars, writeDevVars } from "../utils/dotenv.js";
 
 /**
@@ -37,17 +42,27 @@ export const initCommand = defineCommand({
 		description: "Interactive PDS setup wizard",
 	},
 	args: {
-		local: {
+		production: {
 			type: "boolean",
-			description: "Write to .dev.vars instead of wrangler secrets/config",
+			description:
+				"Deploy secrets to Cloudflare (prompts to reuse .dev.vars values)",
 			default: false,
 		},
 	},
 	async run({ args }) {
 		p.intro("PDS Setup Wizard");
 
-		// Get current config
-		const currentVars = args.local ? readDevVars() : getVars();
+		const isProduction = args.production;
+		if (isProduction) {
+			p.log.info("Production mode: secrets will be deployed via wrangler");
+		}
+
+		// Get current config from both sources
+		const wranglerVars = getVars();
+		const devVars = readDevVars();
+
+		// Use wrangler vars as primary source for public config
+		const currentVars = { ...devVars, ...wranglerVars };
 
 		// Prompt for hostname
 		const hostname = await p.text({
@@ -90,73 +105,138 @@ export const initCommand = defineCommand({
 			process.exit(0);
 		}
 
-		// Prompt for password
-		const password = await p.password({
-			message: "Account password:",
-		});
-		if (p.isCancel(password)) {
-			p.cancel("Cancelled");
-			process.exit(0);
-		}
-
-		const confirm = await p.password({
-			message: "Confirm password:",
-		});
-		if (p.isCancel(confirm)) {
-			p.cancel("Cancelled");
-			process.exit(0);
-		}
-
-		if (password !== confirm) {
-			p.log.error("Passwords do not match");
-			process.exit(1);
-		}
-
 		const spinner = p.spinner();
-		spinner.start("Hashing password...");
-		const passwordHash = await bcrypt.hash(password, 10);
-		spinner.stop("Password hashed");
 
-		spinner.start("Generating JWT secret...");
-		const jwtSecret = randomBytes(32).toString("base64");
-		spinner.stop("JWT secret generated");
+		// In production mode, we may reuse secrets from .dev.vars
+		// Otherwise, we always generate fresh values
+		let authToken: string;
+		let signingKey: string;
+		let signingKeyPublic: string;
+		let jwtSecret: string;
+		let passwordHash: string;
 
-		spinner.start("Generating auth token...");
-		const authToken = randomBytes(32).toString("base64url");
-		spinner.stop("Auth token generated");
-
-		spinner.start("Generating signing keypair...");
-		const keypair = await Secp256k1Keypair.create({ exportable: true });
-		const signingKey = JSON.stringify(await keypair.export());
-		const signingKeyPublic = keypair.did().replace("did:key:", "");
-		spinner.stop("Signing keypair generated");
-
-		// Save everything
-		if (args.local) {
-			spinner.start("Writing to .dev.vars...");
-			writeDevVars({
-				PDS_HOSTNAME: hostname,
-				DID: did,
-				HANDLE: handle,
-				SIGNING_KEY_PUBLIC: signingKeyPublic,
-				AUTH_TOKEN: authToken,
-				SIGNING_KEY: signingKey,
-				JWT_SECRET: jwtSecret,
-				PASSWORD_HASH: passwordHash,
+		if (isProduction) {
+			// For each secret, ask if we should reuse from .dev.vars
+			authToken = await getOrGenerateSecret("AUTH_TOKEN", devVars, async () => {
+				spinner.start("Generating auth token...");
+				const token = randomBytes(32).toString("base64url");
+				spinner.stop("Auth token generated");
+				return token;
 			});
-			spinner.stop("Written to .dev.vars");
+
+			const signingResult = await getOrGenerateSecret(
+				"SIGNING_KEY",
+				devVars,
+				async () => {
+					spinner.start("Generating signing keypair...");
+					const keypair = await Secp256k1Keypair.create({ exportable: true });
+					const key = JSON.stringify(await keypair.export());
+					spinner.stop("Signing keypair generated");
+					return key;
+				},
+			);
+			signingKey = signingResult;
+
+			// For public key, derive from the signing key we're using
+			const keypairForPublic = await Secp256k1Keypair.import(
+				JSON.parse(signingKey),
+			);
+			signingKeyPublic = keypairForPublic.did().replace("did:key:", "");
+
+			jwtSecret = await getOrGenerateSecret("JWT_SECRET", devVars, async () => {
+				spinner.start("Generating JWT secret...");
+				const secret = randomBytes(32).toString("base64");
+				spinner.stop("JWT secret generated");
+				return secret;
+			});
+
+			passwordHash = await getOrGenerateSecret(
+				"PASSWORD_HASH",
+				devVars,
+				async () => {
+					// Need to prompt for password
+					const password = await p.password({
+						message: "Account password:",
+					});
+					if (p.isCancel(password)) {
+						p.cancel("Cancelled");
+						process.exit(0);
+					}
+
+					const confirm = await p.password({
+						message: "Confirm password:",
+					});
+					if (p.isCancel(confirm)) {
+						p.cancel("Cancelled");
+						process.exit(0);
+					}
+
+					if (password !== confirm) {
+						p.log.error("Passwords do not match");
+						process.exit(1);
+					}
+
+					spinner.start("Hashing password...");
+					const hash = await bcrypt.hash(password, 10);
+					spinner.stop("Password hashed");
+					return hash;
+				},
+			);
 		} else {
-			// Set vars in wrangler.jsonc
-			spinner.start("Updating wrangler.jsonc...");
-			setVars({
-				PDS_HOSTNAME: hostname,
-				DID: did,
-				HANDLE: handle,
-				SIGNING_KEY_PUBLIC: signingKeyPublic,
+			// Local mode: always prompt for password and generate fresh secrets
+			const password = await p.password({
+				message: "Account password:",
 			});
-			spinner.stop("wrangler.jsonc updated");
+			if (p.isCancel(password)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
 
-			// Set secrets via wrangler
+			const confirm = await p.password({
+				message: "Confirm password:",
+			});
+			if (p.isCancel(confirm)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			if (password !== confirm) {
+				p.log.error("Passwords do not match");
+				process.exit(1);
+			}
+
+			spinner.start("Hashing password...");
+			passwordHash = await bcrypt.hash(password, 10);
+			spinner.stop("Password hashed");
+
+			spinner.start("Generating JWT secret...");
+			jwtSecret = randomBytes(32).toString("base64");
+			spinner.stop("JWT secret generated");
+
+			spinner.start("Generating auth token...");
+			authToken = randomBytes(32).toString("base64url");
+			spinner.stop("Auth token generated");
+
+			spinner.start("Generating signing keypair...");
+			const keypair = await Secp256k1Keypair.create({ exportable: true });
+			signingKey = JSON.stringify(await keypair.export());
+			signingKeyPublic = keypair.did().replace("did:key:", "");
+			spinner.stop("Signing keypair generated");
+		}
+
+		// Always set public vars in wrangler.jsonc
+		spinner.start("Updating wrangler.jsonc...");
+		setVars({
+			PDS_HOSTNAME: hostname,
+			DID: did,
+			HANDLE: handle,
+			SIGNING_KEY_PUBLIC: signingKeyPublic,
+		});
+		spinner.stop("wrangler.jsonc updated");
+
+		// Set secrets based on mode
+		if (isProduction) {
+			// Deploy secrets via wrangler
 			spinner.start("Setting AUTH_TOKEN...");
 			await setSecret("AUTH_TOKEN", authToken);
 			spinner.stop("AUTH_TOKEN set");
@@ -172,6 +252,16 @@ export const initCommand = defineCommand({
 			spinner.start("Setting PASSWORD_HASH...");
 			await setSecret("PASSWORD_HASH", passwordHash);
 			spinner.stop("PASSWORD_HASH set");
+		} else {
+			// Write secrets to .dev.vars for local development
+			spinner.start("Writing secrets to .dev.vars...");
+			writeDevVars({
+				AUTH_TOKEN: authToken,
+				SIGNING_KEY: signingKey,
+				JWT_SECRET: jwtSecret,
+				PASSWORD_HASH: passwordHash,
+			});
+			spinner.stop("Secrets written to .dev.vars");
 		}
 
 		// Generate TypeScript types
@@ -192,12 +282,44 @@ export const initCommand = defineCommand({
 				"  HANDLE: " + handle,
 				"  SIGNING_KEY_PUBLIC: " + signingKeyPublic,
 				"",
+				isProduction
+					? "Secrets deployed to Cloudflare"
+					: "Secrets saved to .dev.vars",
+				"",
 				"Auth token (save this!):",
 				"  " + authToken,
 			].join("\n"),
 			"Setup Complete",
 		);
 
-		p.outro("Your PDS is configured! Run 'wrangler deploy' to deploy.");
+		if (isProduction) {
+			p.outro("Your PDS is configured! Run 'wrangler deploy' to deploy.");
+		} else {
+			p.outro("Your PDS is configured! Run 'pnpm dev' to start locally.");
+		}
 	},
 });
+
+/**
+ * Helper to get a secret from .dev.vars or generate a new one
+ */
+async function getOrGenerateSecret(
+	name: SecretName,
+	devVars: Record<string, string>,
+	generate: () => Promise<string>,
+): Promise<string> {
+	if (devVars[name]) {
+		const useExisting = await p.confirm({
+			message: `Use ${name} from .dev.vars?`,
+			initialValue: true,
+		});
+		if (p.isCancel(useExisting)) {
+			p.cancel("Cancelled");
+			process.exit(0);
+		}
+		if (useExisting) {
+			return devVars[name];
+		}
+	}
+	return generate();
+}

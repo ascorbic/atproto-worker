@@ -59,13 +59,13 @@ describe("create-pds e2e", () => {
 		);
 
 		expect(packageJson.name).toBe(PROJECT_NAME);
-		expect(packageJson.dependencies["@ascorbic/pds-worker"]).toBeDefined();
+		expect(packageJson.dependencies["@ascorbic/pds"]).toBeDefined();
 	});
 
 	it("includes correct worker entry point", () => {
 		const indexTs = readFileSync(join(PROJECT_DIR, "src/index.ts"), "utf-8");
 
-		expect(indexTs).toContain("@ascorbic/pds-worker");
+		expect(indexTs).toContain("@ascorbic/pds");
 		expect(indexTs).toContain("AccountDurableObject");
 	});
 

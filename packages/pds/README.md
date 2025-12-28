@@ -1,4 +1,4 @@
-# @ascorbic/pds-worker
+# @ascorbic/pds
 
 A single-user [AT Protocol](https://atproto.com) Personal Data Server (PDS) that runs on Cloudflare Workers. Host your own Bluesky identity with minimal infrastructure.
 
@@ -39,14 +39,14 @@ If you prefer to set things up yourself:
 ### 1. Install the package
 
 ```bash
-npm install @ascorbic/pds-worker
+npm install @ascorbic/pds
 ```
 
 ### 2. Create a worker entry point
 
 ```typescript
 // src/index.ts
-export { default, AccountDurableObject } from "@ascorbic/pds-worker";
+export { default, AccountDurableObject } from "@ascorbic/pds";
 ```
 
 ### 3. Configure wrangler.jsonc

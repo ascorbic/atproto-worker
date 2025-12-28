@@ -2117,20 +2117,20 @@ These can all be added later.
 
 ### Design Decision: Zero-Code Re-Export Pattern
 
-For maximum simplicity, users deploying a PDS should not need to write any code. The `@ascorbic/pds-worker` package provides everything needed, and users simply re-export it.
+For maximum simplicity, users deploying a PDS should not need to write any code. The `@ascorbic/pds` package provides everything needed, and users simply re-export it.
 
 #### User's Worker (Minimal)
 
 ```typescript
 // src/index.ts
-export { default, AccountDurableObject } from "@ascorbic/pds-worker";
+export { default, AccountDurableObject } from "@ascorbic/pds";
 ```
 
 That's it. No additional code required.
 
 #### Package Exports
 
-The `@ascorbic/pds-worker` package exports:
+The `@ascorbic/pds` package exports:
 
 ```typescript
 // Core exports for advanced users
@@ -2202,7 +2202,7 @@ All configuration is via environment variables and secrets:
 ```
 demos/pds/
 ├── src/
-│   └── index.ts          # Re-exports @ascorbic/pds-worker
+│   └── index.ts          # Re-exports @ascorbic/pds
 ├── wrangler.jsonc        # Worker config with bindings
 ├── package.json          # Dependencies
 ├── .env.example          # Template for required vars

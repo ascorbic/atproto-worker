@@ -21,7 +21,7 @@ This file provides guidance to agentic coding tools when working with code in th
 This is a monorepo using pnpm workspaces with the following structure:
 
 - **Root** (`atproto-worker`): Workspace configuration, shared tooling, plan documents
-- **packages/pds**: The main PDS library (`@ascorbic/pds-worker`)
+- **packages/pds**: The main PDS library (`@ascorbic/pds`)
 - **demos/pds**: Demo PDS deployment
 
 ## Commands

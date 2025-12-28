@@ -89,4 +89,4 @@ Once deployed, your PDS serves:
 
 - [AT Protocol Docs](https://atproto.com)
 - [Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)
-- [@ascorbic/pds-worker on GitHub](https://github.com/ascorbic/atproto-worker)
+- [@ascorbic/pds on GitHub](https://github.com/ascorbic/atproto-worker)

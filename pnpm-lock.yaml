@@ -26,7 +26,7 @@ importers:
 
   demos/pds:
     dependencies:
-      '@ascorbic/pds-worker':
+      '@ascorbic/pds':
         specifier: ^0.0.0
         version: link:../../packages/pds
     devDependencies:

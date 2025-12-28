@@ -1,5 +1,5 @@
 {
-	"name": "@ascorbic/pds-worker",
+	"name": "@ascorbic/pds",
 	"version": "0.0.0",
 	"description": "AT Protocol PDS on Cloudflare Workers",
 	"type": "module",

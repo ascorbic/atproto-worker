@@ -1,6 +1,6 @@
 # Personal PDS on Cloudflare Workers
 
-This is an example deployment of `@ascorbic/pds-worker` - a single-user AT Protocol Personal Data Server on Cloudflare Workers.
+This is an example deployment of `@ascorbic/pds` - a single-user AT Protocol Personal Data Server on Cloudflare Workers.
 
 > **⚠️ Experimental Software**
 >
@@ -76,11 +76,11 @@ Configuration is via environment variables: vars in the `wrangler.jsonc` and sec
 
 ## Architecture
 
-This deployment simply re-exports the `@ascorbic/pds-worker` package:
+This deployment simply re-exports the `@ascorbic/pds` package:
 
 ```typescript
 // src/index.ts
-export { default, AccountDurableObject } from "@ascorbic/pds-worker";
+export { default, AccountDurableObject } from "@ascorbic/pds";
 ```
 
 No additional code needed!

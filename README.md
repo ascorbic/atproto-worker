@@ -14,5 +14,5 @@ This PDS is designed to federate with the Bluesky network - relays can sync from
 
 ## Packages
 
-- `@ascorbic/pds-worker` - The main PDS library
+- `@ascorbic/pds` - The main PDS library
 - `@demo/pds` - A deployable demo instance

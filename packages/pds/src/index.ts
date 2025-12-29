@@ -53,9 +53,47 @@ try {
 	);
 }
 
-// Bluesky service DIDs for service auth
+// Bluesky service DIDs and endpoints for service auth
 const APPVIEW_DID = "did:web:api.bsky.app";
+const APPVIEW_ENDPOINT = "https://api.bsky.app";
 const CHAT_DID = "did:web:api.bsky.chat";
+const CHAT_ENDPOINT = "https://api.bsky.chat";
+
+// Cache for DID document lookups (1 hour TTL)
+const DID_CACHE_TTL = 60 * 60 * 1000;
+const didCache = new Map<
+	string,
+	{ doc: any; timestamp: number }
+>();
+
+/**
+ * Resolve DID with caching
+ */
+async function resolveDidWithCache(did: string): Promise<any> {
+	// Check cache first
+	const cached = didCache.get(did);
+	if (cached && Date.now() - cached.timestamp < DID_CACHE_TTL) {
+		return cached.doc;
+	}
+
+	// Fetch from network
+	const doc = await resolveDidDocument(did);
+
+	// Update cache
+	didCache.set(did, { doc, timestamp: Date.now() });
+
+	// Limit cache size to prevent memory issues
+	if (didCache.size > 1000) {
+		// Remove oldest entries
+		const entries = Array.from(didCache.entries());
+		entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+		for (let i = 0; i < 100; i++) {
+			didCache.delete(entries[i][0]);
+		}
+	}
+
+	return doc;
+}
 
 // Lazy-loaded keypair for service auth
 let keypairPromise: Promise<Secp256k1Keypair> | null = null;
@@ -260,11 +298,20 @@ app.post("/admin/emit-identity", requireAuth, async (c) => {
 // Proxy unhandled XRPC requests to services specified via atproto-proxy header
 // or fall back to Bluesky services for backward compatibility
 app.all("/xrpc/*", async (c) => {
-	const url = new URL(c.req.url);
-	url.protocol = "https:";
-
 	// Extract XRPC method name from path (e.g., "app.bsky.feed.getTimeline")
+	const url = new URL(c.req.url);
 	const lxm = url.pathname.replace("/xrpc/", "");
+
+	// Validate XRPC path to prevent path traversal
+	if (lxm.includes("..") || lxm.includes("//")) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Invalid XRPC method path",
+			},
+			400,
+		);
+	}
 
 	// Check for atproto-proxy header for explicit service routing
 	const proxyHeader = c.req.header("atproto-proxy");
@@ -285,8 +332,26 @@ app.all("/xrpc/*", async (c) => {
 		}
 
 		try {
-			// Resolve DID document to get service endpoint
-			const didDoc = await resolveDidDocument(parsed.did);
+			// Resolve DID document to get service endpoint (with caching)
+			// Special-case main Bluesky services to use known endpoints instead of fetching
+			let didDoc: any;
+			if (parsed.did === APPVIEW_DID || parsed.did === CHAT_DID) {
+				// Use cached endpoint but still validate service exists
+				didDoc = {
+					id: parsed.did,
+					service: [
+						{
+							id: "#atproto_appview",
+							type: "AtprotoAppView",
+							serviceEndpoint:
+								parsed.did === APPVIEW_DID ? APPVIEW_ENDPOINT : CHAT_ENDPOINT,
+						},
+					],
+				};
+			} else {
+				didDoc = await resolveDidWithCache(parsed.did);
+			}
+
 			const endpoint = extractServiceEndpoint(didDoc, parsed.serviceId);
 
 			if (!endpoint) {
@@ -301,7 +366,8 @@ app.all("/xrpc/*", async (c) => {
 
 			// Use the resolved service endpoint
 			audienceDid = parsed.did;
-			targetUrl = new URL(url.pathname + url.search, endpoint);
+			// Construct URL safely using URL constructor
+			targetUrl = new URL(`/xrpc/${lxm}${url.search}`, endpoint);
 		} catch (err) {
 			return c.json(
 				{
@@ -314,9 +380,11 @@ app.all("/xrpc/*", async (c) => {
 	} else {
 		// Fallback: Route to Bluesky services based on lexicon namespace
 		const isChat = lxm.startsWith("chat.bsky.");
-		url.host = isChat ? "api.bsky.chat" : "api.bsky.app";
+		const endpoint = isChat ? CHAT_ENDPOINT : APPVIEW_ENDPOINT;
 		audienceDid = isChat ? CHAT_DID : APPVIEW_DID;
-		targetUrl = url;
+
+		// Construct URL safely using URL constructor
+		targetUrl = new URL(`/xrpc/${lxm}${url.search}`, endpoint);
 	}
 
 	// Check for authorization header
@@ -359,10 +427,23 @@ app.all("/xrpc/*", async (c) => {
 	}
 
 	// Forward request with potentially replaced auth header
-	// Remove original headers that shouldn't be forwarded
+	// Remove headers that shouldn't be forwarded (security/privacy)
 	const originalHeaders = Object.fromEntries(c.req.raw.headers);
-	delete originalHeaders["authorization"];
-	delete originalHeaders["atproto-proxy"]; // Don't forward the proxy header
+	const headersToRemove = [
+		"authorization", // Replaced with service JWT
+		"atproto-proxy", // Internal routing header
+		"host", // Will be set by fetch
+		"connection", // Connection-specific
+		"cookie", // Privacy - don't leak cookies
+		"x-forwarded-for", // Don't leak client IP
+		"x-real-ip", // Don't leak client IP
+		"x-forwarded-proto", // Internal
+		"x-forwarded-host", // Internal
+	];
+
+	for (const header of headersToRemove) {
+		delete originalHeaders[header];
+	}
 
 	const reqInit: RequestInit = {
 		method: c.req.method,

@@ -90,7 +90,7 @@ describe("DID Resolver", () => {
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 
-		it("should return null for non-existent service", () => {
+		it("should return undefined for non-existent service", () => {
 			const doc: DidDocument = {
 				id: "did:web:example.com",
 				service: [
@@ -103,16 +103,16 @@ describe("DID Resolver", () => {
 			};
 
 			const endpoint = extractServiceEndpoint(doc, "nonexistent");
-			expect(endpoint).toBeNull();
+			expect(endpoint).toBeUndefined();
 		});
 
-		it("should return null when no services exist", () => {
+		it("should return undefined when no services exist", () => {
 			const doc: DidDocument = {
 				id: "did:web:example.com",
 			};
 
 			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
-			expect(endpoint).toBeNull();
+			expect(endpoint).toBeUndefined();
 		});
 
 		it("should handle multiple services", () => {

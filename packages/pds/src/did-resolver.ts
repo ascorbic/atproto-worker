@@ -2,6 +2,25 @@
  * DID resolution utilities for XRPC service proxying
  */
 
+/**
+ * Validate service endpoint URL
+ * Based on @atproto/common-web/src/did-doc.ts
+ */
+function validateServiceUrl(urlStr: string): string | undefined {
+	// Check protocol to prevent obvious issues
+	if (!urlStr.startsWith("http://") && !urlStr.startsWith("https://")) {
+		return undefined;
+	}
+
+	// Validate URL can be parsed
+	try {
+		new URL(urlStr);
+		return urlStr;
+	} catch {
+		return undefined;
+	}
+}
+
 export interface DidDocument {
 	"@context"?: string | string[];
 	id: string;
@@ -118,32 +137,35 @@ async function resolveDidPlc(did: string): Promise<DidDocument> {
 
 /**
  * Extract service endpoint URL from DID document
- * Returns the serviceEndpoint URL for the matching service ID
+ * Based on @atproto/common-web/src/did-doc.ts getServiceEndpoint
  */
 export function extractServiceEndpoint(
 	doc: DidDocument,
 	serviceId: string,
-): string | null {
+): string | undefined {
 	if (!doc.service) {
-		return null;
+		return undefined;
 	}
 
-	// Service ID may be just the fragment (e.g., "atproto_labeler")
-	// or the full ID (e.g., "did:web:example.com#atproto_labeler")
-	const normalizedServiceId = serviceId.startsWith("#")
-		? serviceId
-		: `#${serviceId}`;
+	// Normalize service ID to start with #
+	const id = serviceId.startsWith("#") ? serviceId : `#${serviceId}`;
 
-	const service = doc.service.find(
-		(s) =>
-			s.id === normalizedServiceId ||
-			s.id === `${doc.id}${normalizedServiceId}` ||
-			s.id === serviceId,
-	);
+	// Find service by ID (matches either #id or did#id format)
+	for (const service of doc.service) {
+		const itemId = service.id;
+		const matches =
+			itemId === id || // e.g., "#atproto_labeler"
+			(itemId.length === doc.id.length + id.length && // e.g., "did:web:example.com#atproto_labeler"
+				itemId.endsWith(id) &&
+				itemId.startsWith(doc.id));
 
-	if (!service) {
-		return null;
+		if (matches) {
+			if (typeof service.serviceEndpoint !== "string") {
+				return undefined;
+			}
+			return validateServiceUrl(service.serviceEndpoint);
+		}
 	}
 
-	return service.serviceEndpoint;
+	return undefined;
 }

@@ -1,12 +1,46 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi, afterEach } from "vitest";
 import { env, worker } from "./helpers";
+
+// Mock DID documents for testing
+const mockDidDocuments: Record<string, any> = {
+	"did:web:labeler.example.com": {
+		id: "did:web:labeler.example.com",
+		service: [
+			{
+				id: "#atproto_labeler",
+				type: "AtprotoLabeler",
+				serviceEndpoint: "https://labeler.example.com",
+			},
+		],
+	},
+	"did:web:api.bsky.app": {
+		id: "did:web:api.bsky.app",
+		service: [
+			{
+				id: "#atproto_appview",
+				type: "AtprotoAppView",
+				serviceEndpoint: "https://api.bsky.app",
+			},
+		],
+	},
+};
 
 describe("XRPC Service Proxying", () => {
 	let authToken: string;
+	let originalFetch: typeof fetch;
 
 	beforeAll(async () => {
 		// Get auth token for tests that need authentication
 		authToken = env.AUTH_TOKEN;
+
+		// Save original fetch
+		originalFetch = globalThis.fetch;
+	});
+
+	afterEach(() => {
+		// Restore original fetch after each test
+		globalThis.fetch = originalFetch;
+		vi.unstubAllGlobals();
 	});
 
 	describe("atproto-proxy header", () => {
@@ -53,6 +87,20 @@ describe("XRPC Service Proxying", () => {
 		});
 
 		it("should handle DID resolution failure gracefully", async () => {
+			// Mock fetch to simulate DID resolution failure
+			vi.stubGlobal(
+				"fetch",
+				vi.fn((url: string) => {
+					if (
+						url ===
+						"https://nonexistent-domain-12345.invalid/.well-known/did.json"
+					) {
+						return Promise.reject(new Error("DNS lookup failed"));
+					}
+					return originalFetch(url);
+				}),
+			);
+
 			const response = await worker.fetch(
 				new Request(
 					"http://pds.test/xrpc/app.bsky.feed.getAuthorFeed?actor=test.bsky.social",
@@ -75,7 +123,25 @@ describe("XRPC Service Proxying", () => {
 		});
 
 		it("should reject when service not found in DID document", async () => {
-			// Use a service ID that won't exist in any DID document
+			// Mock fetch to return DID document without the requested service
+			vi.stubGlobal(
+				"fetch",
+				vi.fn((url: string) => {
+					if (url === "https://api.bsky.app/.well-known/did.json") {
+						return Promise.resolve(
+							new Response(
+								JSON.stringify(mockDidDocuments["did:web:api.bsky.app"]),
+								{
+									status: 200,
+									headers: { "Content-Type": "application/json" },
+								},
+							),
+						);
+					}
+					return originalFetch(url);
+				}),
+			);
+
 			const response = await worker.fetch(
 				new Request(
 					"http://pds.test/xrpc/app.bsky.feed.getAuthorFeed?actor=test.bsky.social",
@@ -90,19 +156,83 @@ describe("XRPC Service Proxying", () => {
 
 			expect(response.status).toBe(400);
 			const data = await response.json();
-			// Could fail during resolution OR find the service doesn't exist
-			expect(data.error).toBe("InvalidRequest");
-			expect(
-				data.message.includes("Failed to resolve service") ||
-					data.message.includes("Service not found"),
-			).toBe(true);
+			expect(data).toMatchObject({
+				error: "InvalidRequest",
+				message: expect.stringContaining("Service not found in DID document"),
+			});
+		});
+
+		it("should successfully proxy with valid atproto-proxy header", async () => {
+			// Mock fetch for both DID resolution and the proxied request
+			vi.stubGlobal(
+				"fetch",
+				vi.fn((url: string, init?: RequestInit) => {
+					if (url === "https://labeler.example.com/.well-known/did.json") {
+						return Promise.resolve(
+							new Response(
+								JSON.stringify(mockDidDocuments["did:web:labeler.example.com"]),
+								{
+									status: 200,
+									headers: { "Content-Type": "application/json" },
+								},
+							),
+						);
+					}
+					if (url.startsWith("https://labeler.example.com/xrpc/")) {
+						// Verify the service JWT was added
+						const authHeader = (init?.headers as Record<string, string>)?.[
+							"Authorization"
+						];
+						expect(authHeader).toMatch(/^Bearer /);
+
+						return Promise.resolve(
+							new Response(JSON.stringify({ success: true }), {
+								status: 200,
+								headers: { "Content-Type": "application/json" },
+							}),
+						);
+					}
+					return originalFetch(url, init);
+				}),
+			);
+
+			const response = await worker.fetch(
+				new Request(
+					"http://pds.test/xrpc/app.bsky.feed.getAuthorFeed?actor=test.bsky.social",
+					{
+						headers: {
+							"atproto-proxy": "did:web:labeler.example.com#atproto_labeler",
+							Authorization: `Bearer ${authToken}`,
+						},
+					},
+				),
+				env,
+			);
+
+			expect(response.status).toBe(200);
+			const data = await response.json();
+			expect(data).toEqual({ success: true });
 		});
 	});
 
 	describe("Fallback behavior", () => {
 		it("should proxy to Bluesky AppView when no proxy header present", async () => {
-			// This should proxy to api.bsky.app (we can't test the full flow
-			// but we can verify it doesn't return 404 or proxy header errors)
+			// Mock fetch to verify request goes to api.bsky.app
+			vi.stubGlobal(
+				"fetch",
+				vi.fn((url: string) => {
+					if (url.includes("api.bsky.app")) {
+						return Promise.resolve(
+							new Response(JSON.stringify({ proxied: true }), {
+								status: 200,
+								headers: { "Content-Type": "application/json" },
+							}),
+						);
+					}
+					return originalFetch(url);
+				}),
+			);
+
 			const response = await worker.fetch(
 				new Request(
 					"http://pds.test/xrpc/app.bsky.actor.getProfile?actor=test.bsky.social",
@@ -110,14 +240,28 @@ describe("XRPC Service Proxying", () => {
 				env,
 			);
 
-			// We expect this to be proxied (status won't be 404 or 400 for proxy errors)
-			// The actual response depends on api.bsky.app
-			expect(response.status).not.toBe(404);
+			expect(response.status).toBe(200);
+			const data = await response.json();
+			expect(data).toEqual({ proxied: true });
 		});
 
 		it("should proxy chat methods to api.bsky.chat", async () => {
-			// Verify chat.bsky.* methods get routed to chat service
-			// without proxy header
+			// Mock fetch to verify request goes to api.bsky.chat
+			vi.stubGlobal(
+				"fetch",
+				vi.fn((url: string) => {
+					if (url.includes("api.bsky.chat")) {
+						return Promise.resolve(
+							new Response(JSON.stringify({ chat: true }), {
+								status: 200,
+								headers: { "Content-Type": "application/json" },
+							}),
+						);
+					}
+					return originalFetch(url);
+				}),
+			);
+
 			const response = await worker.fetch(
 				new Request("http://pds.test/xrpc/chat.bsky.convo.getConvo?convoId=123", {
 					headers: {
@@ -127,12 +271,33 @@ describe("XRPC Service Proxying", () => {
 				env,
 			);
 
-			// Should be proxied, not 404
-			expect(response.status).not.toBe(404);
+			expect(response.status).toBe(200);
+			const data = await response.json();
+			expect(data).toEqual({ chat: true });
 		});
 
 		it("should forward Authorization header as service JWT", async () => {
-			// Test that auth header is properly converted to service JWT
+			let capturedAuthHeader: string | undefined;
+
+			// Mock fetch to capture the Authorization header
+			vi.stubGlobal(
+				"fetch",
+				vi.fn((url: string, init?: RequestInit) => {
+					if (url.includes("api.bsky.app")) {
+						capturedAuthHeader = (init?.headers as Record<string, string>)?.[
+							"Authorization"
+						];
+						return Promise.resolve(
+							new Response(JSON.stringify({ ok: true }), {
+								status: 200,
+								headers: { "Content-Type": "application/json" },
+							}),
+						);
+					}
+					return originalFetch(url, init);
+				}),
+			);
+
 			const response = await worker.fetch(
 				new Request(
 					"http://pds.test/xrpc/app.bsky.actor.getProfile?actor=test.bsky.social",
@@ -145,13 +310,11 @@ describe("XRPC Service Proxying", () => {
 				env,
 			);
 
-			// Should be proxied (not a 404)
-			// The exact response depends on the environment:
-			// - In production: would get response from api.bsky.app
-			// - In test: may get 401 (if network works) or 500 (if network fails)
-			// The key is we don't get 404 (not found), which would indicate
-			// the request wasn't routed to the proxy handler
-			expect(response.status).not.toBe(404);
+			expect(response.status).toBe(200);
+			// Verify service JWT was created and forwarded
+			expect(capturedAuthHeader).toMatch(/^Bearer /);
+			// The forwarded token should be different from the original (it's a service JWT)
+			expect(capturedAuthHeader).not.toBe(`Bearer ${authToken}`);
 		});
 	});
 });

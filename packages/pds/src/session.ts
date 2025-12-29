@@ -131,6 +131,21 @@ export interface ServiceJwtPayload {
 	jti?: string; // Token ID (optional)
 }
 
+// Cached keypair for service JWT verification
+let cachedKeypair: Secp256k1Keypair | null = null;
+let cachedSigningKey: string | null = null;
+
+async function getVerificationKeypair(
+	signingKey: string,
+): Promise<Secp256k1Keypair> {
+	if (cachedKeypair && cachedSigningKey === signingKey) {
+		return cachedKeypair;
+	}
+	cachedKeypair = await Secp256k1Keypair.import(signingKey);
+	cachedSigningKey = signingKey;
+	return cachedKeypair;
+}
+
 /**
  * Verify a service JWT signed with our signing key.
  * These are issued by getServiceAuth and used by external services
@@ -176,9 +191,9 @@ export async function verifyServiceJwt(
 		throw new Error(`Invalid issuer: expected ${expectedIssuer}`);
 	}
 
-	// Verify signature using our signing key
-	// Import keypair fresh each time to avoid module-scope caching issues
-	const keypair = await Secp256k1Keypair.import(signingKey);
+	// Verify signature using our signing key (with caching)
+	const keypair = await getVerificationKeypair(signingKey);
+	// Uint8Array wrapper is required - Buffer polyfill doesn't work with @atproto/crypto
 	const msgBytes = new Uint8Array(
 		Buffer.from(`${headerB64}.${payloadB64}`, "utf8"),
 	);

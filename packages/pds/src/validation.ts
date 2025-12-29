@@ -1,4 +1,4 @@
-import { Lexicons, type LexiconDoc } from "@atproto/lexicon";
+import { Lexicons, jsonToLex, type LexiconDoc } from "@atproto/lexicon";
 
 /**
  * Record validator for AT Protocol records.
@@ -62,9 +62,12 @@ export class RecordValidator {
 			return;
 		}
 
+		// Convert JSON to lexicon format (handles $link -> CID, blob -> BlobRef)
+		const lexRecord = jsonToLex(record);
+
 		// We have a schema, so validate against it
 		try {
-			this.lex.assertValidRecord(collection, record);
+			this.lex.assertValidRecord(collection, lexRecord);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			throw new Error(

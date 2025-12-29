@@ -23,15 +23,18 @@ schemas=(
   "app/bsky/feed/like"
   "app/bsky/feed/repost"
   "app/bsky/feed/threadgate"
+  "app/bsky/feed/defs"
 
   # Actor schemas
   "app/bsky/actor/profile"
+  "app/bsky/actor/defs"
 
   # Graph schemas
   "app/bsky/graph/follow"
   "app/bsky/graph/block"
   "app/bsky/graph/list"
   "app/bsky/graph/listitem"
+  "app/bsky/graph/defs"
 
   # Richtext schemas
   "app/bsky/richtext/facet"
@@ -41,6 +44,11 @@ schemas=(
   "app/bsky/embed/external"
   "app/bsky/embed/record"
   "app/bsky/embed/recordWithMedia"
+  "app/bsky/embed/video"
+  "app/bsky/embed/defs"
+
+  # Notification schemas (referenced by actor.defs)
+  "app/bsky/notification/defs"
 )
 
 # Fetch each schema

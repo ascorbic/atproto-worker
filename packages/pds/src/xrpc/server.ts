@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import type { AccountDurableObject } from "../account-do";
+import { createServiceJwt, getSigningKeypair } from "../service-auth";
 import {
 	createAccessToken,
 	createRefreshToken,
@@ -256,4 +257,36 @@ export async function getAccountStatus(
 			importedBlobs: null,
 		});
 	}
+}
+
+/**
+ * Get a service auth token for communicating with external services.
+ * Used by clients to get JWTs for services like video.bsky.app.
+ */
+export async function getServiceAuth(
+	c: Context<AuthedAppEnv>,
+): Promise<Response> {
+	const aud = c.req.query("aud");
+	const lxm = c.req.query("lxm") || null;
+
+	if (!aud) {
+		return c.json(
+			{
+				error: "InvalidRequest",
+				message: "Missing required parameter: aud",
+			},
+			400,
+		);
+	}
+
+	// Create service JWT for the requested audience
+	const keypair = await getSigningKeypair(c.env.SIGNING_KEY);
+	const token = await createServiceJwt({
+		iss: c.env.DID,
+		aud,
+		lxm,
+		keypair,
+	});
+
+	return c.json({ token });
 }

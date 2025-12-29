@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-	parseProxyHeader,
-	extractServiceEndpoint,
-	type DidDocument,
-} from "../src/did-resolver";
+import { parseProxyHeader, type DidDocument } from "../src/did-resolver";
+import { getServiceEndpoint } from "@atproto/common-web";
 
 describe("DID Resolver URL Validation", () => {
 	describe("Protocol validation", () => {
@@ -19,7 +16,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBeUndefined();
 		});
 
@@ -35,7 +32,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBeUndefined();
 		});
 
@@ -51,7 +48,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("http://example.com");
 		});
 
@@ -67,7 +64,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 
@@ -83,7 +80,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com:8443");
 		});
 
@@ -99,7 +96,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://example.com/labeler");
 		});
 	});
@@ -117,7 +114,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "#atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 
@@ -133,7 +130,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 
@@ -149,7 +146,7 @@ describe("DID Resolver URL Validation", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 	});

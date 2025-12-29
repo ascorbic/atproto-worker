@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-	parseProxyHeader,
-	extractServiceEndpoint,
-	type DidDocument,
-} from "../src/did-resolver";
+import { parseProxyHeader, type DidDocument } from "../src/did-resolver";
+import { getServiceEndpoint } from "@atproto/common-web";
 
 describe("DID Resolver", () => {
 	describe("parseProxyHeader", () => {
@@ -41,7 +38,7 @@ describe("DID Resolver", () => {
 		});
 	});
 
-	describe("extractServiceEndpoint", () => {
+	describe("getServiceEndpoint", () => {
 		it("should extract endpoint with fragment-only ID", () => {
 			const doc: DidDocument = {
 				id: "did:web:example.com",
@@ -54,7 +51,7 @@ describe("DID Resolver", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 
@@ -70,7 +67,7 @@ describe("DID Resolver", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 
@@ -86,7 +83,7 @@ describe("DID Resolver", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "#atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 
@@ -102,7 +99,7 @@ describe("DID Resolver", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "nonexistent");
+			const endpoint = getServiceEndpoint(doc, { id: "#nonexistent" });
 			expect(endpoint).toBeUndefined();
 		});
 
@@ -111,7 +108,7 @@ describe("DID Resolver", () => {
 				id: "did:web:example.com",
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBeUndefined();
 		});
 
@@ -132,7 +129,7 @@ describe("DID Resolver", () => {
 				],
 			};
 
-			const endpoint = extractServiceEndpoint(doc, "atproto_labeler");
+			const endpoint = getServiceEndpoint(doc, { id: "#atproto_labeler" });
 			expect(endpoint).toBe("https://labeler.example.com");
 		});
 	});

@@ -10,11 +10,8 @@ import { ensureValidDid, ensureValidHandle } from "@atproto/syntax";
 import { requireAuth } from "./middleware/auth";
 import { createServiceJwt } from "./service-auth";
 import { verifyAccessToken } from "./session";
-import {
-	parseProxyHeader,
-	resolveDidDocument,
-	extractServiceEndpoint,
-} from "./did-resolver";
+import { parseProxyHeader, resolveDidDocument } from "./did-resolver";
+import { getServiceEndpoint } from "@atproto/common-web";
 import * as sync from "./xrpc/sync";
 import * as repo from "./xrpc/repo";
 import * as server from "./xrpc/server";
@@ -352,7 +349,11 @@ app.all("/xrpc/*", async (c) => {
 				didDoc = await resolveDidWithCache(parsed.did);
 			}
 
-			const endpoint = extractServiceEndpoint(didDoc, parsed.serviceId);
+			// getServiceEndpoint expects the ID to start with #
+			const serviceId = parsed.serviceId.startsWith("#")
+				? parsed.serviceId
+				: `#${parsed.serviceId}`;
+			const endpoint = getServiceEndpoint(didDoc, { id: serviceId });
 
 			if (!endpoint) {
 				return c.json(

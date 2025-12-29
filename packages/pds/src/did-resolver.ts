@@ -2,41 +2,10 @@
  * DID resolution utilities for XRPC service proxying
  */
 
-/**
- * Validate service endpoint URL
- * Based on @atproto/common-web/src/did-doc.ts
- */
-function validateServiceUrl(urlStr: string): string | undefined {
-	// Check protocol to prevent obvious issues
-	if (!urlStr.startsWith("http://") && !urlStr.startsWith("https://")) {
-		return undefined;
-	}
+import type { DidDocument } from "@atproto/common-web";
 
-	// Validate URL can be parsed
-	try {
-		new URL(urlStr);
-		return urlStr;
-	} catch {
-		return undefined;
-	}
-}
-
-export interface DidDocument {
-	"@context"?: string | string[];
-	id: string;
-	alsoKnownAs?: string[];
-	verificationMethod?: Array<{
-		id: string;
-		type: string;
-		controller: string;
-		publicKeyMultibase?: string;
-	}>;
-	service?: Array<{
-		id: string;
-		type: string;
-		serviceEndpoint: string;
-	}>;
-}
+// Re-export the official type
+export type { DidDocument };
 
 /**
  * Parse atproto-proxy header value
@@ -133,39 +102,4 @@ async function resolveDidPlc(did: string): Promise<DidDocument> {
 
 	const doc = await response.json();
 	return doc as DidDocument;
-}
-
-/**
- * Extract service endpoint URL from DID document
- * Based on @atproto/common-web/src/did-doc.ts getServiceEndpoint
- */
-export function extractServiceEndpoint(
-	doc: DidDocument,
-	serviceId: string,
-): string | undefined {
-	if (!doc.service) {
-		return undefined;
-	}
-
-	// Normalize service ID to start with #
-	const id = serviceId.startsWith("#") ? serviceId : `#${serviceId}`;
-
-	// Find service by ID (matches either #id or did#id format)
-	for (const service of doc.service) {
-		const itemId = service.id;
-		const matches =
-			itemId === id || // e.g., "#atproto_labeler"
-			(itemId.length === doc.id.length + id.length && // e.g., "did:web:example.com#atproto_labeler"
-				itemId.endsWith(id) &&
-				itemId.startsWith(doc.id));
-
-		if (matches) {
-			if (typeof service.serviceEndpoint !== "string") {
-				return undefined;
-			}
-			return validateServiceUrl(service.serviceEndpoint);
-		}
-	}
-
-	return undefined;
 }

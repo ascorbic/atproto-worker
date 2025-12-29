@@ -1,6 +1,6 @@
 import type { Context } from "hono";
-import { Secp256k1Keypair } from "@atproto/crypto";
 import type { AccountDurableObject } from "../account-do";
+import { getSigningKeypair } from "../keypair";
 import {
 	createAccessToken,
 	createRefreshToken,
@@ -260,15 +260,6 @@ export async function getAccountStatus(
 	}
 }
 
-// Lazy-loaded keypair for service auth
-let keypairPromise: Promise<Secp256k1Keypair> | null = null;
-function getKeypair(signingKey: string): Promise<Secp256k1Keypair> {
-	if (!keypairPromise) {
-		keypairPromise = Secp256k1Keypair.import(signingKey);
-	}
-	return keypairPromise;
-}
-
 /**
  * Get a service auth token for communicating with external services.
  * Used by clients to get JWTs for services like video.bsky.app.
@@ -290,7 +281,7 @@ export async function getServiceAuth(
 	}
 
 	// Create service JWT for the requested audience
-	const keypair = await getKeypair(c.env.SIGNING_KEY);
+	const keypair = await getSigningKeypair(c.env.SIGNING_KEY);
 	const token = await createServiceJwt({
 		iss: c.env.DID,
 		aud,

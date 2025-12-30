@@ -5,17 +5,11 @@
 
 import type { Context } from "hono";
 import { DidResolver } from "@atproto/identity";
-import { getServiceEndpoint } from "@atproto/common-web";
+import { getServiceEndpoint, type DidDocument } from "@atproto/common-web";
 import { createServiceJwt } from "./service-auth";
 import { verifyAccessToken } from "./session";
 import type { PDSEnv } from "./types";
 import type { Secp256k1Keypair } from "@atproto/crypto";
-
-// Bluesky service DIDs and endpoints for service auth
-const APPVIEW_DID = "did:web:api.bsky.app";
-const APPVIEW_ENDPOINT = "https://api.bsky.app";
-const CHAT_DID = "did:web:api.bsky.chat";
-const CHAT_ENDPOINT = "https://api.bsky.chat";
 
 /**
  * Parse atproto-proxy header value
@@ -31,7 +25,7 @@ export function parseProxyHeader(
 	}
 
 	const [did, serviceId] = parts;
-	if (!did.startsWith("did:")) {
+	if (!did?.startsWith("did:") || !serviceId) {
 		return null;
 	}
 
@@ -82,32 +76,15 @@ export async function handleXrpcProxy(
 
 		try {
 			// Resolve DID document to get service endpoint (with caching)
-			// Special-case main Bluesky services to use known endpoints instead of fetching
-			let didDoc: any;
-			if (parsed.did === APPVIEW_DID || parsed.did === CHAT_DID) {
-				// Use cached endpoint but still validate service exists
-				didDoc = {
-					id: parsed.did,
-					service: [
-						{
-							id: "#atproto_appview",
-							type: "AtprotoAppView",
-							serviceEndpoint:
-								parsed.did === APPVIEW_DID ? APPVIEW_ENDPOINT : CHAT_ENDPOINT,
-						},
-					],
-				};
-			} else {
-				didDoc = await didResolver.resolve(parsed.did);
-				if (!didDoc) {
-					return c.json(
-						{
-							error: "InvalidRequest",
-							message: `DID not found: ${parsed.did}`,
-						},
-						400,
-					);
-				}
+			const didDoc = await didResolver.resolve(parsed.did);
+			if (!didDoc) {
+				return c.json(
+					{
+						error: "InvalidRequest",
+						message: `DID not found: ${parsed.did}`,
+					},
+					400,
+				);
 			}
 
 			// getServiceEndpoint expects the ID to start with #
@@ -129,7 +106,9 @@ export async function handleXrpcProxy(
 			// Use the resolved service endpoint
 			audienceDid = parsed.did;
 			// Construct URL safely using URL constructor
-			targetUrl = new URL(`/xrpc/${lxm}${url.search}`, endpoint);
+			targetUrl = new URL(endpoint);
+			targetUrl.pathname = url.pathname;
+			targetUrl.search = url.search;
 		} catch (err) {
 			return c.json(
 				{
@@ -141,9 +120,10 @@ export async function handleXrpcProxy(
 		}
 	} else {
 		// Fallback: Route to Bluesky services based on lexicon namespace
+		// These are well-known endpoints that don't require DID resolution
 		const isChat = lxm.startsWith("chat.bsky.");
-		const endpoint = isChat ? CHAT_ENDPOINT : APPVIEW_ENDPOINT;
-		audienceDid = isChat ? CHAT_DID : APPVIEW_DID;
+		audienceDid = isChat ? "did:web:api.bsky.chat" : "did:web:api.bsky.app";
+		const endpoint = isChat ? "https://api.bsky.chat" : "https://api.bsky.app";
 
 		// Construct URL safely using URL constructor
 		targetUrl = new URL(`/xrpc/${lxm}${url.search}`, endpoint);
@@ -170,6 +150,9 @@ export async function handleXrpcProxy(
 					c.env.JWT_SECRET,
 					serviceDid,
 				);
+				if (!payload.sub) {
+					throw new Error("Missing sub claim in token");
+				}
 				userDid = payload.sub;
 			}
 

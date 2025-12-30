@@ -208,27 +208,21 @@ export function generateDpopNonce(): string {
 // ============================================
 
 /**
- * Map JWA algorithm names to Web Crypto parameters
+ * JWA algorithm to Web Crypto parameter mapping
  */
+const ALGORITHM_PARAMS: Record<string, { name: string; namedCurve?: string; hash: string }> = {
+	ES256: { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" },
+	ES384: { name: "ECDSA", namedCurve: "P-384", hash: "SHA-384" },
+	ES512: { name: "ECDSA", namedCurve: "P-521", hash: "SHA-512" },
+	RS256: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+	RS384: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-384" },
+	RS512: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" },
+};
+
 function getAlgorithmParams(
 	alg: string
-): { name: string; namedCurve?: string; hash?: string } | null {
-	switch (alg) {
-		case "ES256":
-			return { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" };
-		case "ES384":
-			return { name: "ECDSA", namedCurve: "P-384", hash: "SHA-384" };
-		case "ES512":
-			return { name: "ECDSA", namedCurve: "P-521", hash: "SHA-512" };
-		case "RS256":
-			return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
-		case "RS384":
-			return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-384" };
-		case "RS512":
-			return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" };
-		default:
-			return null;
-	}
+): { name: string; namedCurve?: string; hash: string } | null {
+	return ALGORITHM_PARAMS[alg] ?? null;
 }
 
 /**

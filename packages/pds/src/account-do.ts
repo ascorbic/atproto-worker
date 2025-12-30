@@ -17,6 +17,7 @@ import { TID } from "@atproto/common-web";
 import { AtUri } from "@atproto/syntax";
 import { encode as cborEncode } from "@atproto/lex-cbor";
 import { SqliteRepoStorage } from "./storage";
+import { SqliteOAuthStorage } from "./oauth-storage";
 import { Sequencer, type SeqEvent, type CommitData } from "./sequencer";
 import { BlobStore, type BlobRef } from "./blobs";
 import type { PDSEnv } from "./types";
@@ -32,6 +33,7 @@ import type { PDSEnv } from "./types";
  */
 export class AccountDurableObject extends DurableObject<PDSEnv> {
 	private storage: SqliteRepoStorage | null = null;
+	private oauthStorage: SqliteOAuthStorage | null = null;
 	private repo: Repo | null = null;
 	private keypair: Secp256k1Keypair | null = null;
 	private sequencer: Sequencer | null = null;
@@ -66,6 +68,8 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 
 				this.storage = new SqliteRepoStorage(this.ctx.storage.sql);
 				this.storage.initSchema();
+				this.oauthStorage = new SqliteOAuthStorage(this.ctx.storage.sql);
+				this.oauthStorage.initSchema();
 				this.sequencer = new Sequencer(this.ctx.storage.sql);
 				this.storageInitialized = true;
 			});
@@ -108,6 +112,14 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	async getStorage(): Promise<SqliteRepoStorage> {
 		await this.ensureStorageInitialized();
 		return this.storage!;
+	}
+
+	/**
+	 * Get the OAuth storage adapter for OAuth operations.
+	 */
+	async getOAuthStorage(): Promise<SqliteOAuthStorage> {
+		await this.ensureStorageInitialized();
+		return this.oauthStorage!;
 	}
 
 	/**

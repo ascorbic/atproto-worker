@@ -97,6 +97,9 @@ importers:
 
   packages/pds:
     dependencies:
+      '@ascorbic/atproto-oauth-provider':
+        specifier: workspace:*
+        version: link:../oauth-provider
       '@atproto/common-web':
         specifier: ^0.4.7
         version: 0.4.7

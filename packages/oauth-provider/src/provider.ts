@@ -199,13 +199,26 @@ export class ATProtoOAuthProvider {
 
 		const redirectUri = params.redirect_uri!;
 		const state = params.state!;
+		const responseMode = params.response_mode ?? "fragment";
 
 		// Handle deny
 		if (action === "deny") {
 			const errorUrl = new URL(redirectUri);
-			errorUrl.searchParams.set("error", "access_denied");
-			errorUrl.searchParams.set("error_description", "User denied authorization");
-			errorUrl.searchParams.set("state", state);
+
+			if (responseMode === "fragment") {
+				const hashParams = new URLSearchParams();
+				hashParams.set("error", "access_denied");
+				hashParams.set("error_description", "User denied authorization");
+				hashParams.set("state", state);
+				hashParams.set("iss", this.issuer);
+				errorUrl.hash = hashParams.toString();
+			} else {
+				errorUrl.searchParams.set("error", "access_denied");
+				errorUrl.searchParams.set("error_description", "User denied authorization");
+				errorUrl.searchParams.set("state", state);
+				errorUrl.searchParams.set("iss", this.issuer);
+			}
+
 			return Response.redirect(errorUrl.toString(), 302);
 		}
 
@@ -259,10 +272,23 @@ export class ATProtoOAuthProvider {
 
 		await this.storage.saveAuthCode(code, authCodeData);
 
-		// Redirect with code
+		// Redirect with code (using fragment mode if requested)
 		const successUrl = new URL(redirectUri);
-		successUrl.searchParams.set("code", code);
-		successUrl.searchParams.set("state", state);
+
+		if (responseMode === "fragment") {
+			// Put params in hash fragment
+			const hashParams = new URLSearchParams();
+			hashParams.set("code", code);
+			hashParams.set("state", state);
+			hashParams.set("iss", this.issuer);
+			successUrl.hash = hashParams.toString();
+		} else {
+			// Put params in query string
+			successUrl.searchParams.set("code", code);
+			successUrl.searchParams.set("state", state);
+			successUrl.searchParams.set("iss", this.issuer);
+		}
+
 		return Response.redirect(successUrl.toString(), 302);
 	}
 
@@ -503,6 +529,7 @@ export class ATProtoOAuthProvider {
 			authorization_endpoint: `${this.issuer}/oauth/authorize`,
 			token_endpoint: `${this.issuer}/oauth/token`,
 			response_types_supported: ["code"],
+			response_modes_supported: ["fragment", "query"],
 			grant_types_supported: ["authorization_code", "refresh_token"],
 			code_challenge_methods_supported: ["S256"],
 			token_endpoint_auth_methods_supported: ["none"],

@@ -45,13 +45,11 @@ export interface DpopVerifyOptions {
  * DPoP verification error
  */
 export class DpopError extends Error {
-	constructor(
-		message: string,
-		public readonly code: string,
-		public readonly cause?: unknown
-	) {
-		super(message);
+	readonly code: string;
+	constructor(message: string, code: string, options?: ErrorOptions) {
+		super(message, options);
 		this.name = "DpopError";
+		this.code = code;
 	}
 }
 
@@ -127,9 +125,9 @@ export async function verifyDpopProof(
 		payload = result.payload as typeof payload;
 	} catch (err) {
 		if (err instanceof JOSEError) {
-			throw new DpopError(`DPoP verification failed: ${err.message}`, "invalid_dpop", err);
+			throw new DpopError(`DPoP verification failed: ${err.message}`, "invalid_dpop", { cause: err });
 		}
-		throw new DpopError("DPoP verification failed", "invalid_dpop", err);
+		throw new DpopError("DPoP verification failed", "invalid_dpop", { cause: err });
 	}
 
 	// 3. Validate required claims
@@ -286,19 +284,22 @@ export async function generateDpopKeyPair(
 		throw new Error(`Unsupported algorithm: ${alg}`);
 	}
 
-	const generateParams: EcKeyGenParams | RsaHashedKeyGenParams =
+	const generateParams =
 		params.name === "ECDSA"
 			? { name: params.name, namedCurve: params.namedCurve! }
 			: {
 					name: params.name,
 					modulusLength: 2048,
 					publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-					hash: params.hash!,
+					hash: params.hash,
 				};
 
-	const keyPair = await crypto.subtle.generateKey(generateParams, true, ["sign", "verify"]);
+	const keyPair = (await crypto.subtle.generateKey(generateParams, true, [
+		"sign",
+		"verify",
+	])) as CryptoKeyPair;
 
-	const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+	const publicJwk = (await crypto.subtle.exportKey("jwk", keyPair.publicKey)) as JsonWebKey;
 
 	// Remove optional fields that shouldn't be in the proof
 	delete publicJwk.key_ops;

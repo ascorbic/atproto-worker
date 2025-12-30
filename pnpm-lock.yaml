@@ -38,7 +38,7 @@ importers:
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.17.0
-        version: 1.17.0(vite@6.4.1(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.21.0))(workerd@1.20251210.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))
+        version: 1.17.0(vite@6.4.1(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.21.0))(workerd@1.20251219.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))
       vite:
         specifier: ^6.4.1
         version: 6.4.1(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.21.0)
@@ -82,6 +82,9 @@ importers:
       '@arethetypeswrong/cli':
         specifier: ^0.18.2
         version: 0.18.2
+      '@cloudflare/workers-types':
+        specifier: ^4.20251225.0
+        version: 4.20251225.0
       publint:
         specifier: ^0.3.16
         version: 0.3.16
@@ -355,7 +358,7 @@ packages:
       wrangler: ^4.53.0
 
   '@cloudflare/vitest-pool-workers@https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632':
-    resolution: {integrity: sha512-bUcBi9IflGaKQGFyxjyluNfZ4Wi+0jJzz2SMwWpHGqTPtfLJqfGv3VhfpecEE2Dir6Vohtn7Frs8uiIVThM9JA==, tarball: https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632}
+    resolution: {tarball: https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632}
     version: 0.11.1
     peerDependencies:
       '@vitest/runner': 4.0.16
@@ -2920,15 +2923,21 @@ snapshots:
     optionalDependencies:
       workerd: 1.20251210.0
 
+  '@cloudflare/unenv-preset@2.7.13(unenv@2.0.0-rc.24)(workerd@1.20251219.0)':
+    dependencies:
+      unenv: 2.0.0-rc.24
+    optionalDependencies:
+      workerd: 1.20251219.0
+
   '@cloudflare/unenv-preset@https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/unenv-preset@64982d4(unenv@2.0.0-rc.24)(workerd@1.20251219.0)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
       workerd: 1.20251219.0
 
-  '@cloudflare/vite-plugin@1.17.0(vite@6.4.1(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.21.0))(workerd@1.20251210.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))':
+  '@cloudflare/vite-plugin@1.17.0(vite@6.4.1(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.21.0))(workerd@1.20251219.0)(wrangler@4.54.0(@cloudflare/workers-types@4.20251225.0))':
     dependencies:
-      '@cloudflare/unenv-preset': 2.7.13(unenv@2.0.0-rc.24)(workerd@1.20251210.0)
+      '@cloudflare/unenv-preset': 2.7.13(unenv@2.0.0-rc.24)(workerd@1.20251219.0)
       '@remix-run/node-fetch-server': 0.8.1
       defu: 6.1.4
       get-port: 7.1.0

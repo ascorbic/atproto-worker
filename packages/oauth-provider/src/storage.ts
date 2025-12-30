@@ -296,13 +296,8 @@ export class InMemoryOAuthStorage implements OAuthStorage {
 			return false;
 		}
 		this.nonces.add(nonce);
-		// Auto-cleanup old nonces after 5 minutes
-		setTimeout(
-			() => {
-				this.nonces.delete(nonce);
-			},
-			5 * 60 * 1000
-		);
+		// Note: No auto-cleanup in test implementation - use clear() between tests
+		// Production SQLite storage handles TTL-based cleanup properly
 		return true;
 	}
 

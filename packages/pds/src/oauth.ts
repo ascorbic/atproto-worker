@@ -210,9 +210,17 @@ export function createOAuthApp(
 			return c.json({});
 		}
 
-		// Try to revoke the token
+		// Try to revoke the token (RFC 7009 accepts both access and refresh tokens)
 		const accountDO = getAccountDO(c.env);
+
+		// First try as access token
 		await accountDO.rpcRevokeToken(token);
+
+		// Also check if it's a refresh token and revoke the associated access token
+		const tokenData = await accountDO.rpcGetTokenByRefresh(token);
+		if (tokenData) {
+			await accountDO.rpcRevokeToken(tokenData.accessToken);
+		}
 
 		// Always return success (per RFC 7009)
 		return c.json({});

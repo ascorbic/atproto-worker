@@ -184,7 +184,7 @@ export class ClientResolver {
 			cachedAt: Date.now(),
 		};
 
-		// 9. Cache metadata
+		// 8. Cache metadata
 		if (this.storage) {
 			await this.storage.saveClient(clientId, metadata);
 		}

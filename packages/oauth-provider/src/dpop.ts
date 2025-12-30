@@ -220,7 +220,10 @@ const ALGORITHM_PARAMS = {
 } as const;
 
 function getAlgorithmParams(alg: string) {
-	return ALGORITHM_PARAMS[alg as keyof typeof ALGORITHM_PARAMS] ?? null;
+	if (alg in ALGORITHM_PARAMS) {
+		return ALGORITHM_PARAMS[alg as keyof typeof ALGORITHM_PARAMS];
+	}
+	return null;
 }
 
 /**

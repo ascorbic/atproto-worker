@@ -38,6 +38,18 @@ export interface ClientResolverOptions {
 }
 
 /**
+ * Check if a string is a valid HTTPS URL
+ */
+function isHttpsUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Validate that a string is a valid DID using @atproto/syntax
  */
 function isValidDid(value: string): boolean {
@@ -50,22 +62,27 @@ function isValidDid(value: string): boolean {
 }
 
 /**
- * Extract the client metadata URL from a DID
- * For did:web, this is the /.well-known/oauth-client-metadata endpoint
+ * Get the client metadata URL from a client ID
+ * Supports both URL-based and DID-based client IDs
  */
-function getClientMetadataUrl(did: string): string | null {
-	if (did.startsWith("did:web:")) {
+function getClientMetadataUrl(clientId: string): string | null {
+	// URL-based client ID: the URL itself is the metadata endpoint
+	if (isHttpsUrl(clientId)) {
+		return clientId;
+	}
+
+	// DID-based client ID: derive the metadata URL
+	if (clientId.startsWith("did:web:")) {
 		// did:web:example.com -> https://example.com/.well-known/oauth-client-metadata
 		// did:web:example.com:path -> https://example.com/path/.well-known/oauth-client-metadata
-		const parts = did.slice(8).split(":");
+		const parts = clientId.slice(8).split(":");
 		const host = parts[0]!.replace(/%3A/g, ":");
 		const path = parts.slice(1).join("/");
 		const baseUrl = `https://${host}${path ? "/" + path : ""}`;
 		return `${baseUrl}/.well-known/oauth-client-metadata`;
 	}
 
-	// For other DID methods, we'd need a DID resolver
-	// For now, return null to indicate unsupported
+	// Unsupported client ID format
 	return null;
 }
 
@@ -84,14 +101,14 @@ export class ClientResolver {
 	}
 
 	/**
-	 * Resolve client metadata from a client ID (DID)
-	 * @param clientId The client DID
+	 * Resolve client metadata from a client ID (URL or DID)
+	 * @param clientId The client ID (HTTPS URL or DID)
 	 * @returns The client metadata
 	 * @throws ClientResolutionError if resolution fails
 	 */
 	async resolveClient(clientId: string): Promise<ClientMetadata> {
-		// 1. Validate client ID is a valid DID
-		if (!isValidDid(clientId)) {
+		// 1. Validate client ID format (URL or DID)
+		if (!isHttpsUrl(clientId) && !isValidDid(clientId)) {
 			throw new ClientResolutionError(
 				`Invalid client ID format: ${clientId}`,
 				"invalid_client"
@@ -110,7 +127,7 @@ export class ClientResolver {
 		const metadataUrl = getClientMetadataUrl(clientId);
 		if (!metadataUrl) {
 			throw new ClientResolutionError(
-				`Unsupported DID method for client: ${clientId}`,
+				`Unsupported client ID format: ${clientId}`,
 				"invalid_client"
 			);
 		}

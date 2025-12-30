@@ -210,19 +210,17 @@ export function generateDpopNonce(): string {
 /**
  * JWA algorithm to Web Crypto parameter mapping
  */
-const ALGORITHM_PARAMS: Record<string, { name: string; namedCurve?: string; hash: string }> = {
+const ALGORITHM_PARAMS = {
 	ES256: { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" },
 	ES384: { name: "ECDSA", namedCurve: "P-384", hash: "SHA-384" },
 	ES512: { name: "ECDSA", namedCurve: "P-521", hash: "SHA-512" },
 	RS256: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
 	RS384: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-384" },
 	RS512: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" },
-};
+} as const;
 
-function getAlgorithmParams(
-	alg: string
-): { name: string; namedCurve?: string; hash: string } | null {
-	return ALGORITHM_PARAMS[alg] ?? null;
+function getAlgorithmParams(alg: string) {
+	return ALGORITHM_PARAMS[alg as keyof typeof ALGORITHM_PARAMS] ?? null;
 }
 
 /**

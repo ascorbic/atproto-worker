@@ -3,9 +3,9 @@
  * Implements RFC 9449 using jose library for JWT operations
  */
 
-import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint, errors } from "jose";
+import { jwtVerify, EmbeddedJWK, calculateJwkThumbprint, errors, base64url } from "jose";
 import type { JWK } from "jose";
-import { base64UrlEncode, randomString } from "./encoding.js";
+import { randomString } from "./encoding.js";
 
 const { JOSEError } = errors;
 
@@ -170,7 +170,7 @@ export async function verifyDpopProof(
 		}
 
 		const tokenHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(accessToken));
-		const expectedAth = base64UrlEncode(tokenHash);
+		const expectedAth = base64url.encode(new Uint8Array(tokenHash));
 
 		if (payload.ath !== expectedAth) {
 			throw new DpopError('DPoP "ath" mismatch', "invalid_dpop");
@@ -247,7 +247,7 @@ export async function createDpopProof(
 	};
 
 	const payload = {
-		jti: base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)).buffer),
+		jti: base64url.encode(crypto.getRandomValues(new Uint8Array(16))),
 		htm: claims.htm,
 		htu: claims.htu,
 		iat: Math.floor(Date.now() / 1000),
@@ -255,8 +255,8 @@ export async function createDpopProof(
 		...(claims.nonce && { nonce: claims.nonce }),
 	};
 
-	const headerB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(header)));
-	const payloadB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+	const headerB64 = base64url.encode(new TextEncoder().encode(JSON.stringify(header)));
+	const payloadB64 = base64url.encode(new TextEncoder().encode(JSON.stringify(payload)));
 
 	const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
 	const params = getAlgorithmParams(alg);
@@ -265,10 +265,10 @@ export async function createDpopProof(
 	}
 
 	const signParams =
-		params.name === "ECDSA" ? { name: params.name, hash: params.hash! } : { name: params.name };
+		params.name === "ECDSA" ? { name: params.name, hash: params.hash } : { name: params.name };
 
 	const signature = await crypto.subtle.sign(signParams, privateKey, data);
-	const signatureB64 = base64UrlEncode(signature);
+	const signatureB64 = base64url.encode(new Uint8Array(signature));
 
 	return `${headerB64}.${payloadB64}.${signatureB64}`;
 }

@@ -3,7 +3,8 @@
  * Implements RFC 7636 with S256 challenge method
  */
 
-import { base64UrlEncode, randomString } from "./encoding.js";
+import { base64url } from "jose";
+import { randomString } from "./encoding.js";
 
 /**
  * Generate the S256 code challenge from a verifier
@@ -15,7 +16,7 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 	const encoder = new TextEncoder();
 	const data = encoder.encode(verifier);
 	const hash = await crypto.subtle.digest("SHA-256", data);
-	return base64UrlEncode(hash);
+	return base64url.encode(new Uint8Array(hash));
 }
 
 /**

@@ -6,15 +6,22 @@ This file provides guidance to agentic coding tools when working with code in th
 
 - Repository root is `atproto-worker` not `packages/pds/`
 - Use `pwd` or check `process.cwd()` to confirm location
-- Many project files (CLAUDE.md, EDGE_PDS_PLAN.md) are at repository root
+- Many project files (CLAUDE.md, plans/) are at repository root
 - Package-specific files are in `packages/pds/`
 
-**ALWAYS read and update the implementation plan:**
+**ALWAYS read and update implementation plans:**
 
-- **Read** `EDGE_PDS_PLAN.md` at the repository root before starting work to understand project status
-- **Update** `EDGE_PDS_PLAN.md` when you complete phases or discover important implementation details
-- The plan tracks what's completed, what's pending, and critical technical notes
-- Keep the "Completed" section updated with new learnings (WebSocket patterns, CBOR encoding, etc.)
+- Plans are organized in the `plans/` directory at repository root:
+  - `plans/complete/` - Completed features with full documentation
+  - `plans/in-progress/` - Active development work
+  - `plans/todo/` - Planned future features and improvements
+- **Read** relevant plan documents before starting work to understand project status and prior decisions
+- **Update** plan documents when you complete features, discover important implementation details, or change priorities
+- Key plan documents:
+  - `plans/complete/core-pds.md` - Core PDS implementation (all completed features)
+  - `plans/todo/endpoint-implementation.md` - Endpoint implementation status and priorities
+  - `plans/todo/oauth-provider.md` - OAuth 2.1 implementation plan
+  - `plans/todo/migration-wizard.md` - Account migration UX specification
 
 ## Repository Structure
 

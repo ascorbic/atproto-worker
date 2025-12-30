@@ -8,8 +8,9 @@ import { env as _env } from "cloudflare:workers";
 import { Secp256k1Keypair } from "@atproto/crypto";
 import { ensureValidDid, ensureValidHandle } from "@atproto/syntax";
 import { requireAuth } from "./middleware/auth";
-import { createServiceJwt } from "./service-auth";
-import { verifyAccessToken } from "./session";
+import { DidResolver } from "./did-resolver";
+import { WorkersDidCache } from "./did-cache";
+import { handleXrpcProxy } from "./xrpc-proxy";
 import * as sync from "./xrpc/sync";
 import * as repo from "./xrpc/repo";
 import * as server from "./xrpc/server";
@@ -48,9 +49,11 @@ try {
 	);
 }
 
-// Bluesky service DIDs for service auth
-const APPVIEW_DID = "did:web:api.bsky.app";
-const CHAT_DID = "did:web:api.bsky.chat";
+const didResolver = new DidResolver({
+	didCache: new WorkersDidCache(),
+	timeout: 3000, // 3 second timeout for DID resolution
+	plcUrl: "https://plc.directory",
+});
 
 // Lazy-loaded keypair for service auth
 let keypairPromise: Promise<Secp256k1Keypair> | null = null;
@@ -256,77 +259,8 @@ app.post("/admin/emit-identity", requireAuth, async (c) => {
 	return c.json(result);
 });
 
-// Proxy unhandled XRPC requests to Bluesky services
-app.all("/xrpc/*", async (c) => {
-	const url = new URL(c.req.url);
-	url.protocol = "https:";
-
-	// Extract XRPC method name from path (e.g., "app.bsky.feed.getTimeline")
-	const lxm = url.pathname.replace("/xrpc/", "");
-
-	// Route to appropriate service based on lexicon namespace
-	const isChat = lxm.startsWith("chat.bsky.");
-	url.host = isChat ? "api.bsky.chat" : "api.bsky.app";
-	const audienceDid = isChat ? CHAT_DID : APPVIEW_DID;
-
-	// Check for authorization header
-	const auth = c.req.header("Authorization");
-	let headers: Record<string, string> = {};
-
-	if (auth?.startsWith("Bearer ")) {
-		const token = auth.slice(7);
-		const serviceDid = `did:web:${c.env.PDS_HOSTNAME}`;
-
-		// Try to verify the token - if valid, create a service JWT
-		try {
-			// Check static token first
-			let userDid: string;
-			if (token === c.env.AUTH_TOKEN) {
-				userDid = c.env.DID;
-			} else {
-				// Verify JWT
-				const payload = await verifyAccessToken(
-					token,
-					c.env.JWT_SECRET,
-					serviceDid,
-				);
-				userDid = payload.sub;
-			}
-
-			// Create service JWT for target service
-			const keypair = await getKeypair();
-			const serviceJwt = await createServiceJwt({
-				iss: userDid,
-				aud: audienceDid,
-				lxm,
-				keypair,
-			});
-			headers["Authorization"] = `Bearer ${serviceJwt}`;
-		} catch {
-			// Token verification failed - forward without auth
-			// Target service will return appropriate error
-		}
-	}
-
-	// Forward request with potentially replaced auth header
-	// Remove original authorization header to prevent conflicts
-	const originalHeaders = Object.fromEntries(c.req.raw.headers);
-	delete originalHeaders["authorization"];
-
-	const reqInit: RequestInit = {
-		method: c.req.method,
-		headers: {
-			...originalHeaders,
-			...headers,
-		},
-	};
-
-	// Include body for non-GET requests
-	if (c.req.method !== "GET" && c.req.method !== "HEAD") {
-		reqInit.body = c.req.raw.body;
-	}
-
-	return fetch(url.toString(), reqInit);
-});
+// Proxy unhandled XRPC requests to services specified via atproto-proxy header
+// or fall back to Bluesky services for backward compatibility
+app.all("/xrpc/*", (c) => handleXrpcProxy(c, didResolver, getKeypair));
 
 export default app;

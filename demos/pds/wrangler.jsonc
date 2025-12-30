@@ -41,10 +41,13 @@
 		"DID": "did:web:pds.mk.gg",
 		// Account handle (e.g., "alice.example.com")
 		"HANDLE": "pds.mk.gg"
-	}
+	},
 	// Secrets (set via `pds init` or `pds secret <name>`):
 	// - AUTH_TOKEN: Bearer token for API write operations
 	// - SIGNING_KEY: Private signing key (secp256k1 JWK)
 	// - JWT_SECRET: Secret for signing session JWTs
 	// - PASSWORD_HASH: Bcrypt hash of account password (for Bluesky app login)
+	"observability": {
+		"enabled": true
+	}
 }

@@ -108,7 +108,9 @@ export async function verifyServiceJwt(
 		throw new Error("Invalid JWT format");
 	}
 
-	const [headerB64, payloadB64, signatureB64] = parts;
+	const headerB64 = parts[0]!;
+	const payloadB64 = parts[1]!;
+	const signatureB64 = parts[2]!;
 
 	// Decode header
 	const header = JSON.parse(Buffer.from(headerB64, "base64url").toString());

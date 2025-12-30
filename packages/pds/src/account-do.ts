@@ -993,6 +993,116 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		return { seq };
 	}
 
+	// ============================================
+	// OAuth Storage RPC Methods
+	// These methods proxy to SqliteOAuthStorage since we can't serialize the storage object
+	// ============================================
+
+	/** Save an authorization code */
+	async rpcSaveAuthCode(
+		code: string,
+		data: import("@ascorbic/atproto-oauth-provider").AuthCodeData,
+	): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.saveAuthCode(code, data);
+	}
+
+	/** Get authorization code data */
+	async rpcGetAuthCode(
+		code: string,
+	): Promise<import("@ascorbic/atproto-oauth-provider").AuthCodeData | null> {
+		const storage = await this.getOAuthStorage();
+		return storage.getAuthCode(code);
+	}
+
+	/** Delete an authorization code */
+	async rpcDeleteAuthCode(code: string): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.deleteAuthCode(code);
+	}
+
+	/** Save token data */
+	async rpcSaveTokens(
+		data: import("@ascorbic/atproto-oauth-provider").TokenData,
+	): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.saveTokens(data);
+	}
+
+	/** Get token data by access token */
+	async rpcGetTokenByAccess(
+		accessToken: string,
+	): Promise<import("@ascorbic/atproto-oauth-provider").TokenData | null> {
+		const storage = await this.getOAuthStorage();
+		return storage.getTokenByAccess(accessToken);
+	}
+
+	/** Get token data by refresh token */
+	async rpcGetTokenByRefresh(
+		refreshToken: string,
+	): Promise<import("@ascorbic/atproto-oauth-provider").TokenData | null> {
+		const storage = await this.getOAuthStorage();
+		return storage.getTokenByRefresh(refreshToken);
+	}
+
+	/** Revoke a token */
+	async rpcRevokeToken(accessToken: string): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.revokeToken(accessToken);
+	}
+
+	/** Revoke all tokens for a user */
+	async rpcRevokeAllTokens(sub: string): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.revokeAllTokens(sub);
+	}
+
+	/** Save client metadata */
+	async rpcSaveClient(
+		clientId: string,
+		metadata: import("@ascorbic/atproto-oauth-provider").ClientMetadata,
+	): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.saveClient(clientId, metadata);
+	}
+
+	/** Get client metadata */
+	async rpcGetClient(
+		clientId: string,
+	): Promise<import("@ascorbic/atproto-oauth-provider").ClientMetadata | null> {
+		const storage = await this.getOAuthStorage();
+		return storage.getClient(clientId);
+	}
+
+	/** Save PAR data */
+	async rpcSavePAR(
+		requestUri: string,
+		data: import("@ascorbic/atproto-oauth-provider").PARData,
+	): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.savePAR(requestUri, data);
+	}
+
+	/** Get PAR data */
+	async rpcGetPAR(
+		requestUri: string,
+	): Promise<import("@ascorbic/atproto-oauth-provider").PARData | null> {
+		const storage = await this.getOAuthStorage();
+		return storage.getPAR(requestUri);
+	}
+
+	/** Delete PAR data */
+	async rpcDeletePAR(requestUri: string): Promise<void> {
+		const storage = await this.getOAuthStorage();
+		await storage.deletePAR(requestUri);
+	}
+
+	/** Check and save DPoP nonce */
+	async rpcCheckAndSaveNonce(nonce: string): Promise<boolean> {
+		const storage = await this.getOAuthStorage();
+		return storage.checkAndSaveNonce(nonce);
+	}
+
 	/**
 	 * HTTP fetch handler for WebSocket upgrades.
 	 * This is used instead of RPC to avoid WebSocket serialization errors.

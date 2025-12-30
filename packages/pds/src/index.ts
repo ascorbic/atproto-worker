@@ -11,7 +11,7 @@ import { requireAuth } from "./middleware/auth";
 import { DidResolver } from "./did-resolver";
 import { WorkersDidCache } from "./did-cache";
 import { handleXrpcProxy } from "./xrpc-proxy";
-import { createOAuthApp, getOAuthStorageFromDO } from "./oauth";
+import { createOAuthApp } from "./oauth";
 import * as sync from "./xrpc/sync";
 import * as repo from "./xrpc/repo";
 import * as server from "./xrpc/server";
@@ -261,10 +261,7 @@ app.post("/admin/emit-identity", requireAuth, async (c) => {
 });
 
 // OAuth 2.1 endpoints for "Login with Bluesky"
-const oauthApp = createOAuthApp(async (env) => {
-	const accountDO = getAccountDO(env);
-	return getOAuthStorageFromDO(accountDO);
-});
+const oauthApp = createOAuthApp(getAccountDO);
 app.route("/", oauthApp);
 
 // Proxy unhandled XRPC requests to services specified via atproto-proxy header

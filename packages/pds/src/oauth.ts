@@ -8,10 +8,85 @@
 
 import { Hono } from "hono";
 import { ATProtoOAuthProvider } from "@ascorbic/atproto-oauth-provider";
-import type { OAuthStorage } from "@ascorbic/atproto-oauth-provider";
+import type {
+	OAuthStorage,
+	AuthCodeData,
+	TokenData,
+	ClientMetadata,
+	PARData,
+} from "@ascorbic/atproto-oauth-provider";
 import { compare } from "bcryptjs";
 import type { PDSEnv } from "./types";
 import type { AccountDurableObject } from "./account-do";
+
+/**
+ * Proxy storage class that delegates to DO RPC methods
+ *
+ * This is needed because the SqliteOAuthStorage object contains a SQL connection
+ * that can't be serialized across the DO RPC boundary. Instead, we delegate each
+ * storage operation to individual RPC methods that pass serializable data.
+ */
+class DOProxyOAuthStorage implements OAuthStorage {
+	constructor(
+		private accountDO: DurableObjectStub<AccountDurableObject>,
+	) {}
+
+	async saveAuthCode(code: string, data: AuthCodeData): Promise<void> {
+		await this.accountDO.rpcSaveAuthCode(code, data);
+	}
+
+	async getAuthCode(code: string): Promise<AuthCodeData | null> {
+		return this.accountDO.rpcGetAuthCode(code);
+	}
+
+	async deleteAuthCode(code: string): Promise<void> {
+		await this.accountDO.rpcDeleteAuthCode(code);
+	}
+
+	async saveTokens(data: TokenData): Promise<void> {
+		await this.accountDO.rpcSaveTokens(data);
+	}
+
+	async getTokenByAccess(accessToken: string): Promise<TokenData | null> {
+		return this.accountDO.rpcGetTokenByAccess(accessToken);
+	}
+
+	async getTokenByRefresh(refreshToken: string): Promise<TokenData | null> {
+		return this.accountDO.rpcGetTokenByRefresh(refreshToken);
+	}
+
+	async revokeToken(accessToken: string): Promise<void> {
+		await this.accountDO.rpcRevokeToken(accessToken);
+	}
+
+	async revokeAllTokens(sub: string): Promise<void> {
+		await this.accountDO.rpcRevokeAllTokens(sub);
+	}
+
+	async saveClient(clientId: string, metadata: ClientMetadata): Promise<void> {
+		await this.accountDO.rpcSaveClient(clientId, metadata);
+	}
+
+	async getClient(clientId: string): Promise<ClientMetadata | null> {
+		return this.accountDO.rpcGetClient(clientId);
+	}
+
+	async savePAR(requestUri: string, data: PARData): Promise<void> {
+		await this.accountDO.rpcSavePAR(requestUri, data);
+	}
+
+	async getPAR(requestUri: string): Promise<PARData | null> {
+		return this.accountDO.rpcGetPAR(requestUri);
+	}
+
+	async deletePAR(requestUri: string): Promise<void> {
+		await this.accountDO.rpcDeletePAR(requestUri);
+	}
+
+	async checkAndSaveNonce(nonce: string): Promise<boolean> {
+		return this.accountDO.rpcCheckAndSaveNonce(nonce);
+	}
+}
 
 /**
  * Create OAuth routes for the PDS
@@ -23,16 +98,17 @@ import type { AccountDurableObject } from "./account-do";
  * - POST /oauth/token - Token endpoint
  * - POST /oauth/par - Pushed Authorization Request
  *
- * @param getOAuthStorage Function to get OAuth storage from the account DO
+ * @param getAccountDO Function to get the account DO stub
  */
 export function createOAuthApp(
-	getOAuthStorage: (env: PDSEnv) => Promise<OAuthStorage>,
+	getAccountDO: (env: PDSEnv) => DurableObjectStub<AccountDurableObject>,
 ) {
 	const oauth = new Hono<{ Bindings: PDSEnv }>();
 
 	// Create provider lazily per request (storage is per-DO)
-	async function getProvider(env: PDSEnv): Promise<ATProtoOAuthProvider> {
-		const storage = await getOAuthStorage(env);
+	function getProvider(env: PDSEnv): ATProtoOAuthProvider {
+		const accountDO = getAccountDO(env);
+		const storage = new DOProxyOAuthStorage(accountDO);
 		const issuer = `https://${env.PDS_HOSTNAME}`;
 
 		return new ATProtoOAuthProvider({
@@ -53,8 +129,8 @@ export function createOAuthApp(
 	}
 
 	// OAuth server metadata
-	oauth.get("/.well-known/oauth-authorization-server", async (c) => {
-		const provider = await getProvider(c.env);
+	oauth.get("/.well-known/oauth-authorization-server", (c) => {
+		const provider = getProvider(c.env);
 		return provider.handleMetadata();
 	});
 
@@ -70,24 +146,24 @@ export function createOAuthApp(
 
 	// Authorization endpoint
 	oauth.get("/oauth/authorize", async (c) => {
-		const provider = await getProvider(c.env);
+		const provider = getProvider(c.env);
 		return provider.handleAuthorize(c.req.raw);
 	});
 
 	oauth.post("/oauth/authorize", async (c) => {
-		const provider = await getProvider(c.env);
+		const provider = getProvider(c.env);
 		return provider.handleAuthorize(c.req.raw);
 	});
 
 	// Token endpoint
 	oauth.post("/oauth/token", async (c) => {
-		const provider = await getProvider(c.env);
+		const provider = getProvider(c.env);
 		return provider.handleToken(c.req.raw);
 	});
 
 	// Pushed Authorization Request endpoint
 	oauth.post("/oauth/par", async (c) => {
-		const provider = await getProvider(c.env);
+		const provider = getProvider(c.env);
 		return provider.handlePAR(c.req.raw);
 	});
 
@@ -112,8 +188,8 @@ export function createOAuthApp(
 		}
 
 		// Try to revoke the token
-		const storage = await getOAuthStorage(c.env);
-		await storage.revokeToken(token);
+		const accountDO = getAccountDO(c.env);
+		await accountDO.rpcRevokeToken(token);
 
 		// Always return success (per RFC 7009)
 		return c.json({});
@@ -127,17 +203,20 @@ export function createOAuthApp(
  *
  * This can be used as middleware for protected endpoints.
  *
- * @param getOAuthStorage Function to get OAuth storage from the account DO
+ * @param getAccountDO Function to get the account DO stub
  */
 export function createOAuthVerifier(
-	getOAuthStorage: (env: PDSEnv) => Promise<OAuthStorage>,
+	getAccountDO: (env: PDSEnv) => DurableObjectStub<AccountDurableObject>,
 ) {
 	return async function verifyOAuthToken(
 		request: Request,
 		env: PDSEnv,
 	): Promise<{ sub: string; scope: string } | null> {
+		const accountDO = getAccountDO(env);
+		const storage = new DOProxyOAuthStorage(accountDO);
+
 		const provider = new ATProtoOAuthProvider({
-			storage: await getOAuthStorage(env),
+			storage,
 			issuer: `https://${env.PDS_HOSTNAME}`,
 			dpopRequired: true,
 		});
@@ -150,13 +229,4 @@ export function createOAuthVerifier(
 			scope: tokenData.scope,
 		};
 	};
-}
-
-/**
- * Helper to get OAuth storage from an account DO instance
- */
-export async function getOAuthStorageFromDO(
-	accountDO: DurableObjectStub<AccountDurableObject>,
-): Promise<OAuthStorage> {
-	return accountDO.getOAuthStorage();
 }

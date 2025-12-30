@@ -90,7 +90,7 @@ export interface ConsentUIOptions {
  * @returns HTML string
  */
 export function renderConsentUI(options: ConsentUIOptions): string {
-	const { client, scope, authorizeUrl, state, oauthParams, userHandle, showLogin, error } = options;
+	const { client, scope, authorizeUrl, oauthParams, userHandle, showLogin, error } = options;
 
 	const clientName = escapeHtml(client.clientName);
 	const scopeDescriptions = getScopeDescriptions(scope);

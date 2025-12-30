@@ -22,9 +22,9 @@ import type { AccountDurableObject } from "./account-do";
 /**
  * Proxy storage class that delegates to DO RPC methods
  *
- * This is needed because the SqliteOAuthStorage object contains a SQL connection
+ * This is needed because SqliteOAuthStorage instances contain a SQL connection
  * that can't be serialized across the DO RPC boundary. Instead, we delegate each
- * storage operation to individual RPC methods that pass serializable data.
+ * storage operation to individual RPC methods that pass only serializable data.
  */
 class DOProxyOAuthStorage implements OAuthStorage {
 	constructor(private accountDO: DurableObjectStub<AccountDurableObject>) {}
@@ -180,7 +180,8 @@ export function createOAuthApp(
 
 	// Token revocation endpoint
 	oauth.post("/oauth/revoke", async (c) => {
-		// Parse the token from the request (accepts JSON or form-urlencoded)
+		// Parse the token from the request
+		// RFC 7009 requires application/x-www-form-urlencoded, we also accept JSON
 		const contentType = c.req.header("Content-Type") ?? "";
 		let token: string | undefined;
 
@@ -192,9 +193,16 @@ export function createOAuthApp(
 				const body = await c.req.text();
 				const params = Object.fromEntries(new URLSearchParams(body).entries());
 				token = params.token;
+			} else if (!contentType) {
+				// No Content-Type: treat as empty body (no token)
+				token = undefined;
 			} else {
 				return c.json(
-					{ error: "invalid_request", error_description: "Content-Type must be application/json or application/x-www-form-urlencoded" },
+					{
+						error: "invalid_request",
+						error_description:
+							"Content-Type must be application/x-www-form-urlencoded (per RFC 7009) or application/json",
+					},
 					400,
 				);
 			}

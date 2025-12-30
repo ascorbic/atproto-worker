@@ -85,7 +85,6 @@ export function generateTokens(options: GenerateTokensOptions): {
 		scope,
 		dpopJkt,
 		accessTokenTtl = ACCESS_TOKEN_TTL,
-		refreshTokenTtl = REFRESH_TOKEN_TTL,
 	} = options;
 
 	const accessToken = generateRandomToken(32);

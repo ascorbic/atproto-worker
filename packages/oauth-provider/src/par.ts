@@ -75,20 +75,20 @@ export class PARHandler {
 			);
 		}
 
-		// 3. Validate client_id is present
+		// 2. Validate client_id is present
 		const clientId = params.client_id;
 		if (!clientId) {
 			return this.errorResponse("invalid_request", "Missing client_id parameter", 400);
 		}
 
-		// 4. Validate required OAuth parameters
+		// 3. Validate required OAuth parameters
 		for (const param of REQUIRED_PARAMS) {
 			if (!params[param]) {
 				return this.errorResponse("invalid_request", `Missing required parameter: ${param}`, 400);
 			}
 		}
 
-		// 5. Validate response_type is "code"
+		// 4. Validate response_type is "code"
 		if (params.response_type !== "code") {
 			return this.errorResponse(
 				"unsupported_response_type",
@@ -97,7 +97,7 @@ export class PARHandler {
 			);
 		}
 
-		// 6. Validate code_challenge_method is S256
+		// 5. Validate code_challenge_method is S256
 		if (params.code_challenge_method !== "S256") {
 			return this.errorResponse(
 				"invalid_request",
@@ -106,7 +106,7 @@ export class PARHandler {
 			);
 		}
 
-		// 7. Validate code_challenge format (base64url, 43 characters for SHA-256)
+		// 6. Validate code_challenge format (base64url, 43 characters for SHA-256)
 		const codeChallenge = params.code_challenge!;
 		if (!/^[A-Za-z0-9_-]{43}$/.test(codeChallenge)) {
 			return this.errorResponse(
@@ -116,14 +116,14 @@ export class PARHandler {
 			);
 		}
 
-		// 8. Validate redirect_uri is a valid URL
+		// 7. Validate redirect_uri is a valid URL
 		try {
 			new URL(params.redirect_uri!);
 		} catch {
 			return this.errorResponse("invalid_request", "Invalid redirect_uri", 400);
 		}
 
-		// 9. Generate request_uri and save params
+		// 8. Generate request_uri and save params
 		const requestUri = generateRequestUri();
 		const expiresAt = Date.now() + this.expiresIn * 1000;
 
@@ -135,7 +135,7 @@ export class PARHandler {
 
 		await this.storage.savePAR(requestUri, parData);
 
-		// 10. Return success response
+		// 9. Return success response
 		const response: OAuthParResponse = {
 			request_uri: requestUri,
 			expires_in: this.expiresIn,

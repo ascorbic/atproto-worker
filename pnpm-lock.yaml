@@ -69,9 +69,9 @@ importers:
 
   packages/oauth-provider:
     dependencies:
-      '@atproto/crypto':
-        specifier: ^0.4.5
-        version: 0.4.5
+      '@atproto/oauth-types':
+        specifier: ^0.5.2
+        version: 0.5.2
       '@atproto/syntax':
         specifier: ^0.4.2
         version: 0.4.2
@@ -205,9 +205,15 @@ packages:
     resolution: {integrity: sha512-n40aKkMoCatP0u9Yvhrdk6fXyOHFDDbkdm4h4HCyWW+KlKl8iXfD5iV+ECq+w5BM+QH25aIpt3/j6EUNerhLxw==}
     engines: {node: '>=18.7.0'}
 
+  '@atproto/did@0.2.3':
+    resolution: {integrity: sha512-VI8JJkSizvM2cHYJa37WlbzeCm5tWpojyc1/Zy8q8OOjyoy6X4S4BEfoP941oJcpxpMTObamibQIXQDo7tnIjg==}
+
   '@atproto/identity@0.4.10':
     resolution: {integrity: sha512-nQbzDLXOhM8p/wo0cTh5DfMSOSHzj6jizpodX37LJ4S1TZzumSxAjHEZa5Rev3JaoD5uSWMVE0MmKEGWkPPvfQ==}
     engines: {node: '>=18.7.0'}
+
+  '@atproto/jwk@0.6.0':
+    resolution: {integrity: sha512-bDoJPvt7TrQVi/rBfBrSSpGykhtIriKxeYCYQTiPRKFfyRhbgpElF0wPXADjIswnbzZdOwbY63az4E/CFVT3Tw==}
 
   '@atproto/lex-cbor@0.0.3':
     resolution: {integrity: sha512-N8lCV3kK5ZcjSOWxKLWqzlnaSpK4isjXRZ0EqApl/5y9KB64s78hQ/U3KIE5qnPRlBbW5kSH3YACoU27u9nTOA==}
@@ -220,6 +226,9 @@ packages:
 
   '@atproto/lexicon@0.6.0':
     resolution: {integrity: sha512-5veb8aD+J5M0qszLJ+73KSFsFrJBgAY/nM1TSAJvGY7fNc9ZAT+PSUlmIyrdye9YznAZ07yktalls/TwNV7cHQ==}
+
+  '@atproto/oauth-types@0.5.2':
+    resolution: {integrity: sha512-9DCDvtvCanTwAaU5UakYDO0hzcOITS3RutK5zfLytE5Y9unj0REmTDdN8Xd8YCfUJl7T/9pYpf04Uyq7bFTASg==}
 
   '@atproto/repo@0.8.12':
     resolution: {integrity: sha512-QpVTVulgfz5PUiCTELlDBiRvnsnwrFWi+6CfY88VwXzrRHd9NE8GItK7sfxQ6U65vD/idH8ddCgFrlrsn1REPQ==}
@@ -2666,10 +2675,19 @@ snapshots:
       '@noble/hashes': 1.8.0
       uint8arrays: 3.0.0
 
+  '@atproto/did@0.2.3':
+    dependencies:
+      zod: 3.25.76
+
   '@atproto/identity@0.4.10':
     dependencies:
       '@atproto/common-web': 0.4.7
       '@atproto/crypto': 0.4.5
+
+  '@atproto/jwk@0.6.0':
+    dependencies:
+      multiformats: 9.9.0
+      zod: 3.25.76
 
   '@atproto/lex-cbor@0.0.3':
     dependencies:
@@ -2696,6 +2714,12 @@ snapshots:
       '@atproto/syntax': 0.4.2
       iso-datestring-validator: 2.2.2
       multiformats: 9.9.0
+      zod: 3.25.76
+
+  '@atproto/oauth-types@0.5.2':
+    dependencies:
+      '@atproto/did': 0.2.3
+      '@atproto/jwk': 0.6.0
       zod: 3.25.76
 
   '@atproto/repo@0.8.12':

@@ -4,7 +4,13 @@
  */
 
 import { ensureValidDid } from "@atproto/syntax";
+import {
+	oauthClientMetadataSchema,
+	type OAuthClientMetadata,
+} from "@atproto/oauth-types";
 import type { ClientMetadata, OAuthStorage } from "./storage.js";
+
+export type { OAuthClientMetadata };
 
 /**
  * Client resolution error
@@ -29,33 +35,6 @@ export interface ClientResolverOptions {
 	cacheTtl?: number;
 	/** Fetch function for making HTTP requests (for testing) */
 	fetch?: typeof globalThis.fetch;
-}
-
-/**
- * Client metadata from OAuth client metadata document
- * Per AT Protocol OAuth spec
- */
-export interface OAuthClientMetadataDocument {
-	/** Client identifier (must match the DID) */
-	client_id: string;
-	/** Human-readable name */
-	client_name?: string;
-	/** Client homepage URL */
-	client_uri?: string;
-	/** Logo URL */
-	logo_uri?: string;
-	/** Redirect URIs */
-	redirect_uris: string[];
-	/** Grant types supported */
-	grant_types?: string[];
-	/** Response types supported */
-	response_types?: string[];
-	/** Token endpoint auth method */
-	token_endpoint_auth_method?: string;
-	/** Scope requested */
-	scope?: string;
-	/** DPoP bound access tokens required */
-	dpop_bound_access_tokens?: boolean;
 }
 
 /**
@@ -158,13 +137,14 @@ export class ClientResolver {
 			);
 		}
 
-		// 5. Parse and validate metadata
-		let doc: OAuthClientMetadataDocument;
+		// 5. Parse and validate metadata using Zod schema
+		let doc: OAuthClientMetadata;
 		try {
-			doc = (await response.json()) as OAuthClientMetadataDocument;
-		} catch {
+			const json = await response.json();
+			doc = oauthClientMetadataSchema.parse(json);
+		} catch (e) {
 			throw new ClientResolutionError(
-				"Failed to parse client metadata JSON",
+				`Invalid client metadata: ${e instanceof Error ? e.message : "validation failed"}`,
 				"invalid_client"
 			);
 		}
@@ -177,15 +157,7 @@ export class ClientResolver {
 			);
 		}
 
-		// 7. Validate required fields
-		if (!doc.redirect_uris || !Array.isArray(doc.redirect_uris) || doc.redirect_uris.length === 0) {
-			throw new ClientResolutionError(
-				"Client metadata must include at least one redirect_uri",
-				"invalid_client"
-			);
-		}
-
-		// 8. Build client metadata
+		// 7. Build client metadata
 		const metadata: ClientMetadata = {
 			clientId: doc.client_id,
 			clientName: doc.client_name ?? clientId,

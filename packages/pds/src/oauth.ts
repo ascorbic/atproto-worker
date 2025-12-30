@@ -27,9 +27,7 @@ import type { AccountDurableObject } from "./account-do";
  * storage operation to individual RPC methods that pass serializable data.
  */
 class DOProxyOAuthStorage implements OAuthStorage {
-	constructor(
-		private accountDO: DurableObjectStub<AccountDurableObject>,
-	) {}
+	constructor(private accountDO: DurableObjectStub<AccountDurableObject>) {}
 
 	async saveAuthCode(code: string, data: AuthCodeData): Promise<void> {
 		await this.accountDO.rpcSaveAuthCode(code, data);
@@ -140,7 +138,11 @@ export function createOAuthApp(
 		return c.json({
 			resource: issuer,
 			authorization_servers: [issuer],
-			scopes_supported: ["atproto", "transition:generic", "transition:chat.bsky"],
+			scopes_supported: [
+				"atproto",
+				"transition:generic",
+				"transition:chat.bsky",
+			],
 		});
 	});
 
@@ -196,37 +198,4 @@ export function createOAuthApp(
 	});
 
 	return oauth;
-}
-
-/**
- * Create a function to verify OAuth access tokens
- *
- * This can be used as middleware for protected endpoints.
- *
- * @param getAccountDO Function to get the account DO stub
- */
-export function createOAuthVerifier(
-	getAccountDO: (env: PDSEnv) => DurableObjectStub<AccountDurableObject>,
-) {
-	return async function verifyOAuthToken(
-		request: Request,
-		env: PDSEnv,
-	): Promise<{ sub: string; scope: string } | null> {
-		const accountDO = getAccountDO(env);
-		const storage = new DOProxyOAuthStorage(accountDO);
-
-		const provider = new ATProtoOAuthProvider({
-			storage,
-			issuer: `https://${env.PDS_HOSTNAME}`,
-			dpopRequired: true,
-		});
-
-		const tokenData = await provider.verifyAccessToken(request);
-		if (!tokenData) return null;
-
-		return {
-			sub: tokenData.sub,
-			scope: tokenData.scope,
-		};
-	};
 }

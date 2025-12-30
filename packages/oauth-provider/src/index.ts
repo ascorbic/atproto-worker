@@ -33,11 +33,11 @@ export type { DpopProof, DpopVerifyOptions } from "./dpop.js";
 
 // PAR
 export { PARHandler } from "./par.js";
-export type { PARResponse, OAuthErrorResponse } from "./par.js";
+export type { OAuthParResponse, OAuthErrorResponse } from "./par.js";
 
 // Client resolution
 export { ClientResolver, createClientResolver, ClientResolutionError } from "./client-resolver.js";
-export type { ClientResolverOptions, OAuthClientMetadataDocument } from "./client-resolver.js";
+export type { ClientResolverOptions, OAuthClientMetadata } from "./client-resolver.js";
 
 // Tokens
 export {

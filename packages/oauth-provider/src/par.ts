@@ -3,8 +3,11 @@
  * Implements RFC 9126
  */
 
+import type { OAuthParResponse } from "@atproto/oauth-types";
 import type { OAuthStorage, PARData } from "./storage.js";
 import { randomString } from "./encoding.js";
+
+export type { OAuthParResponse };
 
 /** PAR request URI prefix per RFC 9126 */
 const REQUEST_URI_PREFIX = "urn:ietf:params:oauth:request_uri:";
@@ -18,14 +21,6 @@ const DEFAULT_EXPIRES_IN = 90;
 export interface OAuthErrorResponse {
 	error: string;
 	error_description?: string;
-}
-
-/**
- * PAR success response
- */
-export interface PARResponse {
-	request_uri: string;
-	expires_in: number;
 }
 
 /**
@@ -148,7 +143,7 @@ export class PARHandler {
 		await this.storage.savePAR(requestUri, parData);
 
 		// 10. Return success response
-		const response: PARResponse = {
+		const response: OAuthParResponse = {
 			request_uri: requestUri,
 			expires_in: this.expiresIn,
 		};

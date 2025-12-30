@@ -171,18 +171,30 @@ export function createOAuthApp(
 
 	// Token revocation endpoint
 	oauth.post("/oauth/revoke", async (c) => {
-		// Parse the token from the request
-		const contentType = c.req.header("Content-Type");
-		if (!contentType?.includes("application/x-www-form-urlencoded")) {
+		// Parse the token from the request (accepts JSON or form-urlencoded)
+		const contentType = c.req.header("Content-Type") ?? "";
+		let token: string | undefined;
+
+		try {
+			if (contentType.includes("application/json")) {
+				const json = await c.req.json();
+				token = json.token;
+			} else if (contentType.includes("application/x-www-form-urlencoded")) {
+				const body = await c.req.text();
+				const params = Object.fromEntries(new URLSearchParams(body).entries());
+				token = params.token;
+			} else {
+				return c.json(
+					{ error: "invalid_request", error_description: "Content-Type must be application/json or application/x-www-form-urlencoded" },
+					400,
+				);
+			}
+		} catch {
 			return c.json(
-				{ error: "invalid_request", error_description: "Invalid content type" },
+				{ error: "invalid_request", error_description: "Failed to parse request body" },
 				400,
 			);
 		}
-
-		const body = await c.req.text();
-		const params = Object.fromEntries(new URLSearchParams(body).entries());
-		const token = params.token;
 
 		if (!token) {
 			// Per RFC 7009, return 200 even if no token provided

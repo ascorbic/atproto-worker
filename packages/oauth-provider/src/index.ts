@@ -4,7 +4,7 @@
  */
 
 // Core provider
-export { ATProtoOAuthProvider } from "./provider.js";
+export { ATProtoOAuthProvider, parseRequestBody, RequestBodyError } from "./provider.js";
 export type { OAuthProviderConfig } from "./provider.js";
 
 // Storage interface and types

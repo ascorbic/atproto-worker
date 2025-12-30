@@ -92,7 +92,7 @@ describe("OAuth 2.1 Endpoints", () => {
 	});
 
 	describe("Token Endpoint", () => {
-		it("should require Content-Type form-urlencoded", async () => {
+		it("should accept JSON body", async () => {
 			const response = await worker.fetch(
 				new Request("http://pds.test/oauth/token", {
 					method: "POST",
@@ -103,10 +103,12 @@ describe("OAuth 2.1 Endpoints", () => {
 				}),
 				env,
 			);
+			// Should fail for missing params, not content type
 			expect(response.status).toBe(400);
 
 			const data = await response.json();
 			expect(data.error).toBe("invalid_request");
+			expect(data.error_description).toContain("code");
 		});
 
 		it("should reject unsupported grant types", async () => {
@@ -164,7 +166,7 @@ describe("OAuth 2.1 Endpoints", () => {
 	});
 
 	describe("PAR Endpoint", () => {
-		it("should require Content-Type form-urlencoded", async () => {
+		it("should accept JSON body", async () => {
 			const response = await worker.fetch(
 				new Request("http://pds.test/oauth/par", {
 					method: "POST",
@@ -175,7 +177,11 @@ describe("OAuth 2.1 Endpoints", () => {
 				}),
 				env,
 			);
+			// Should fail for missing params, not content type
 			expect(response.status).toBe(400);
+			const data = await response.json();
+			expect(data.error).toBe("invalid_request");
+			expect(data.error_description).toContain("redirect_uri");
 		});
 
 		it("should require client_id", async () => {

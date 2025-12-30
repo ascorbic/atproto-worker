@@ -296,15 +296,28 @@ export class ATProtoOAuthProvider {
 	 * Handle token request (POST /oauth/token)
 	 */
 	async handleToken(request: Request): Promise<Response> {
-		// Validate content type
-		const contentType = request.headers.get("Content-Type");
-		if (!contentType?.includes("application/x-www-form-urlencoded")) {
-			return oauthError("invalid_request", "Content-Type must be application/x-www-form-urlencoded");
-		}
+		// Parse body based on content type
+		const contentType = request.headers.get("Content-Type") ?? "";
+		let params: Record<string, string>;
 
-		// Parse form body
-		const body = await request.text();
-		const params = Object.fromEntries(new URLSearchParams(body).entries());
+		try {
+			if (contentType.includes("application/json")) {
+				const json = await request.json();
+				params = Object.fromEntries(
+					Object.entries(json as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+				);
+			} else if (contentType.includes("application/x-www-form-urlencoded")) {
+				const body = await request.text();
+				params = Object.fromEntries(new URLSearchParams(body).entries());
+			} else {
+				return oauthError(
+					"invalid_request",
+					"Content-Type must be application/json or application/x-www-form-urlencoded"
+				);
+			}
+		} catch {
+			return oauthError("invalid_request", "Failed to parse request body");
+		}
 
 		const grantType = params.grant_type;
 

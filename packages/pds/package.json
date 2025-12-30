@@ -20,6 +20,7 @@
 		"check": "publint && attw --pack --ignore-rules=cjs-resolves-to-esm"
 	},
 	"dependencies": {
+		"@ascorbic/atproto-oauth-provider": "workspace:*",
 		"@atproto/common-web": "^0.4.7",
 		"@atproto/crypto": "^0.4.5",
 		"@atproto/identity": "^0.4.10",

@@ -91,7 +91,7 @@ export function writeDevVars(
 
 		const key = trimmed.slice(0, eqIndex).trim();
 		if (key in vars) {
-			outputLines.push(key + "=" + quoteValue(vars[key]));
+			outputLines.push(key + "=" + quoteValue(vars[key]!));
 			updatedKeys.add(key);
 		} else {
 			outputLines.push(line);

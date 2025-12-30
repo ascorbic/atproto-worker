@@ -1,0 +1,13 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"moduleResolution": "bundler",
+		"types": [
+			"tsdown/client",
+			"@cloudflare/workers-types"
+		]
+	},
+	"include": [
+		"src"
+	]
+}

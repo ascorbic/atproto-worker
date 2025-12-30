@@ -60,6 +60,39 @@ function oauthError(error: string, description: string, status: number = 400): R
 }
 
 /**
+ * Parse request body from JSON or form-urlencoded
+ * Returns null if content type is unsupported or parsing fails
+ */
+export async function parseRequestBody(
+	request: Request
+): Promise<{ params: Record<string, string> } | { error: Response }> {
+	const contentType = request.headers.get("Content-Type") ?? "";
+
+	try {
+		if (contentType.includes("application/json")) {
+			const json = await request.json();
+			const params = Object.fromEntries(
+				Object.entries(json as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+			);
+			return { params };
+		} else if (contentType.includes("application/x-www-form-urlencoded")) {
+			const body = await request.text();
+			const params = Object.fromEntries(new URLSearchParams(body).entries());
+			return { params };
+		} else {
+			return {
+				error: oauthError(
+					"invalid_request",
+					"Content-Type must be application/json or application/x-www-form-urlencoded"
+				),
+			};
+		}
+	} catch {
+		return { error: oauthError("invalid_request", "Failed to parse request body") };
+	}
+}
+
+/**
  * AT Protocol OAuth 2.1 Provider
  */
 export class ATProtoOAuthProvider {
@@ -296,28 +329,11 @@ export class ATProtoOAuthProvider {
 	 * Handle token request (POST /oauth/token)
 	 */
 	async handleToken(request: Request): Promise<Response> {
-		// Parse body based on content type
-		const contentType = request.headers.get("Content-Type") ?? "";
-		let params: Record<string, string>;
-
-		try {
-			if (contentType.includes("application/json")) {
-				const json = await request.json();
-				params = Object.fromEntries(
-					Object.entries(json as Record<string, unknown>).map(([k, v]) => [k, String(v)])
-				);
-			} else if (contentType.includes("application/x-www-form-urlencoded")) {
-				const body = await request.text();
-				params = Object.fromEntries(new URLSearchParams(body).entries());
-			} else {
-				return oauthError(
-					"invalid_request",
-					"Content-Type must be application/json or application/x-www-form-urlencoded"
-				);
-			}
-		} catch {
-			return oauthError("invalid_request", "Failed to parse request body");
+		const result = await parseRequestBody(request);
+		if ("error" in result) {
+			return result.error;
 		}
+		const { params } = result;
 
 		const grantType = params.grant_type;
 

@@ -63,7 +63,6 @@ export class PARHandler {
 	 * @returns Response with request_uri or error
 	 */
 	async handlePushRequest(request: Request): Promise<Response> {
-		// 1. Parse body
 		let params: Record<string, string>;
 		try {
 			params = await parseRequestBody(request);
@@ -75,20 +74,17 @@ export class PARHandler {
 			);
 		}
 
-		// 2. Validate client_id is present
 		const clientId = params.client_id;
 		if (!clientId) {
 			return this.errorResponse("invalid_request", "Missing client_id parameter", 400);
 		}
 
-		// 3. Validate required OAuth parameters
 		for (const param of REQUIRED_PARAMS) {
 			if (!params[param]) {
 				return this.errorResponse("invalid_request", `Missing required parameter: ${param}`, 400);
 			}
 		}
 
-		// 4. Validate response_type is "code"
 		if (params.response_type !== "code") {
 			return this.errorResponse(
 				"unsupported_response_type",
@@ -97,7 +93,6 @@ export class PARHandler {
 			);
 		}
 
-		// 5. Validate code_challenge_method is S256
 		if (params.code_challenge_method !== "S256") {
 			return this.errorResponse(
 				"invalid_request",
@@ -106,7 +101,6 @@ export class PARHandler {
 			);
 		}
 
-		// 6. Validate code_challenge format (base64url, 43 characters for SHA-256)
 		const codeChallenge = params.code_challenge!;
 		if (!/^[A-Za-z0-9_-]{43}$/.test(codeChallenge)) {
 			return this.errorResponse(
@@ -116,14 +110,12 @@ export class PARHandler {
 			);
 		}
 
-		// 7. Validate redirect_uri is a valid URL
 		try {
 			new URL(params.redirect_uri!);
 		} catch {
 			return this.errorResponse("invalid_request", "Invalid redirect_uri", 400);
 		}
 
-		// 8. Generate request_uri and save params
 		const requestUri = generateRequestUri();
 		const expiresAt = Date.now() + this.expiresIn * 1000;
 
@@ -135,7 +127,6 @@ export class PARHandler {
 
 		await this.storage.savePAR(requestUri, parData);
 
-		// 9. Return success response
 		const response: OAuthParResponse = {
 			request_uri: requestUri,
 			expires_in: this.expiresIn,
@@ -161,26 +152,22 @@ export class PARHandler {
 		requestUri: string,
 		clientId: string
 	): Promise<Record<string, string> | null> {
-		// 1. Validate request_uri format
 		if (!requestUri.startsWith(REQUEST_URI_PREFIX)) {
 			return null;
 		}
 
-		// 2. Fetch from storage
 		const parData = await this.storage.getPAR(requestUri);
 		if (!parData) {
 			return null;
 		}
 
-		// 3. Verify client_id matches
 		if (parData.clientId !== clientId) {
 			return null;
 		}
 
-		// 4. Delete from storage (one-time use)
+		// One-time use: delete after retrieval
 		await this.storage.deletePAR(requestUri);
 
-		// 5. Return params
 		return parData.params;
 	}
 

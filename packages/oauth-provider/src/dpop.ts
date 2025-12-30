@@ -97,13 +97,11 @@ export async function verifyDpopProof(
 ): Promise<DpopProof> {
 	const { allowedAlgorithms = ["ES256"], accessToken, expectedNonce, maxTokenAge = 60 } = options;
 
-	// 1. Get DPoP header
 	const dpopHeader = request.headers.get("DPoP");
 	if (!dpopHeader) {
 		throw new DpopError("Missing DPoP header", "missing_dpop");
 	}
 
-	// 2. Verify JWT using jose with EmbeddedJWK
 	let protectedHeader: { alg: string; jwk?: JWK };
 	let payload: {
 		jti?: string;
@@ -118,8 +116,8 @@ export async function verifyDpopProof(
 		const result = await jwtVerify(dpopHeader, EmbeddedJWK, {
 			typ: "dpop+jwt",
 			algorithms: allowedAlgorithms,
-			maxTokenAge, // Validates iat claim
-			clockTolerance: 10, // 10 seconds clock tolerance
+			maxTokenAge,
+			clockTolerance: 10,
 		});
 		protectedHeader = result.protectedHeader as typeof protectedHeader;
 		payload = result.payload as typeof payload;
@@ -130,7 +128,6 @@ export async function verifyDpopProof(
 		throw new DpopError("DPoP verification failed", "invalid_dpop", { cause: err });
 	}
 
-	// 3. Validate required claims
 	if (!payload.jti || typeof payload.jti !== "string") {
 		throw new DpopError('DPoP "jti" missing', "invalid_dpop");
 	}
@@ -143,12 +140,10 @@ export async function verifyDpopProof(
 		throw new DpopError('DPoP "htu" missing', "invalid_dpop");
 	}
 
-	// 4. Verify htm matches request method (case-sensitive per RFC 9110)
 	if (payload.htm !== request.method) {
 		throw new DpopError('DPoP "htm" mismatch', "invalid_dpop");
 	}
 
-	// 5. Verify htu matches request URL (normalized, without query/fragment)
 	const requestUrl = new URL(request.url);
 	const expectedHtu = normalizeHtuUrl(requestUrl);
 	const proofHtu = parseHtu(payload.htu);
@@ -156,12 +151,11 @@ export async function verifyDpopProof(
 		throw new DpopError('DPoP "htu" mismatch', "invalid_dpop");
 	}
 
-	// 6. Verify nonce if expected
 	if (expectedNonce !== undefined && payload.nonce !== expectedNonce) {
 		throw new DpopError('DPoP "nonce" mismatch', "use_dpop_nonce");
 	}
 
-	// 7. Verify ath (access token hash) if access token provided
+	// Verify ath (access token hash) binding per RFC 9449 Section 4.3
 	if (accessToken) {
 		if (!payload.ath) {
 			throw new DpopError('DPoP "ath" missing when access token provided', "invalid_dpop");
@@ -177,10 +171,7 @@ export async function verifyDpopProof(
 		throw new DpopError('DPoP "ath" claim not allowed without access token', "invalid_dpop");
 	}
 
-	// 8. Get JWK from header (guaranteed to exist after EmbeddedJWK verification)
 	const jwk = protectedHeader.jwk!;
-
-	// 9. Calculate key thumbprint using jose
 	const jkt = await calculateJwkThumbprint(jwk, "sha256");
 
 	return Object.freeze({

@@ -107,7 +107,6 @@ export class ClientResolver {
 	 * @throws ClientResolutionError if resolution fails
 	 */
 	async resolveClient(clientId: string): Promise<ClientMetadata> {
-		// 1. Validate client ID format (URL or DID)
 		if (!isHttpsUrl(clientId) && !isValidDid(clientId)) {
 			throw new ClientResolutionError(
 				`Invalid client ID format: ${clientId}`,
@@ -115,7 +114,6 @@ export class ClientResolver {
 			);
 		}
 
-		// 2. Check cache
 		if (this.storage) {
 			const cached = await this.storage.getClient(clientId);
 			if (cached && cached.cachedAt && Date.now() - cached.cachedAt < this.cacheTtl) {
@@ -123,7 +121,6 @@ export class ClientResolver {
 			}
 		}
 
-		// 3. Get metadata URL
 		const metadataUrl = getClientMetadataUrl(clientId);
 		if (!metadataUrl) {
 			throw new ClientResolutionError(
@@ -132,7 +129,6 @@ export class ClientResolver {
 			);
 		}
 
-		// 4. Fetch metadata
 		let response: Response;
 		try {
 			response = await this.fetchFn(metadataUrl, {
@@ -154,7 +150,6 @@ export class ClientResolver {
 			);
 		}
 
-		// 5. Parse and validate metadata using Zod schema
 		let doc: OAuthClientMetadata;
 		try {
 			const json = await response.json();
@@ -166,7 +161,6 @@ export class ClientResolver {
 			);
 		}
 
-		// 6. Validate client_id matches
 		if (doc.client_id !== clientId) {
 			throw new ClientResolutionError(
 				`Client ID mismatch: expected ${clientId}, got ${doc.client_id}`,
@@ -174,7 +168,6 @@ export class ClientResolver {
 			);
 		}
 
-		// 7. Build client metadata
 		const metadata: ClientMetadata = {
 			clientId: doc.client_id,
 			clientName: doc.client_name ?? clientId,
@@ -184,7 +177,6 @@ export class ClientResolver {
 			cachedAt: Date.now(),
 		};
 
-		// 8. Cache metadata
 		if (this.storage) {
 			await this.storage.saveClient(clientId, metadata);
 		}

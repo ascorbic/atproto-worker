@@ -6,6 +6,19 @@
 import type { ClientMetadata } from "./storage.js";
 
 /**
+ * Content Security Policy for the consent UI
+ *
+ * - default-src 'none': Deny all by default
+ * - style-src 'unsafe-inline': Allow inline styles (our CSS is inline)
+ * - img-src https: data:: Allow images from HTTPS URLs (client logos) and data URIs
+ * - form-action 'self': Form can only POST to same origin
+ * - frame-ancestors 'none': Prevent clickjacking by disallowing framing
+ * - base-uri 'none': Prevent base tag injection
+ */
+export const CONSENT_UI_CSP =
+	"default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+
+/**
  * Escape HTML to prevent XSS
  */
 function escapeHtml(text: string): string {

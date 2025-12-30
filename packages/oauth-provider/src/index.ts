@@ -55,5 +55,5 @@ export {
 export type { GeneratedTokens, GenerateTokensOptions } from "./tokens.js";
 
 // UI
-export { renderConsentUI, renderErrorPage } from "./ui.js";
+export { renderConsentUI, renderErrorPage, CONSENT_UI_CSP } from "./ui.js";
 export type { ConsentUIOptions } from "./ui.js";

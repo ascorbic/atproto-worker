@@ -60,35 +60,41 @@ function oauthError(error: string, description: string, status: number = 400): R
 }
 
 /**
- * Parse request body from JSON or form-urlencoded
- * Returns null if content type is unsupported or parsing fails
+ * Error thrown when request body parsing fails
  */
-export async function parseRequestBody(
-	request: Request
-): Promise<{ params: Record<string, string> } | { error: Response }> {
+export class RequestBodyError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "RequestBodyError";
+	}
+}
+
+/**
+ * Parse request body from JSON or form-urlencoded
+ * @throws RequestBodyError if content type is unsupported or parsing fails
+ */
+export async function parseRequestBody(request: Request): Promise<Record<string, string>> {
 	const contentType = request.headers.get("Content-Type") ?? "";
 
 	try {
 		if (contentType.includes("application/json")) {
 			const json = await request.json();
-			const params = Object.fromEntries(
+			return Object.fromEntries(
 				Object.entries(json as Record<string, unknown>).map(([k, v]) => [k, String(v)])
 			);
-			return { params };
 		} else if (contentType.includes("application/x-www-form-urlencoded")) {
 			const body = await request.text();
-			const params = Object.fromEntries(new URLSearchParams(body).entries());
-			return { params };
+			return Object.fromEntries(new URLSearchParams(body).entries());
 		} else {
-			return {
-				error: oauthError(
-					"invalid_request",
-					"Content-Type must be application/json or application/x-www-form-urlencoded"
-				),
-			};
+			throw new RequestBodyError(
+				"Content-Type must be application/json or application/x-www-form-urlencoded"
+			);
 		}
-	} catch {
-		return { error: oauthError("invalid_request", "Failed to parse request body") };
+	} catch (e) {
+		if (e instanceof RequestBodyError) {
+			throw e;
+		}
+		throw new RequestBodyError("Failed to parse request body");
 	}
 }
 
@@ -329,11 +335,12 @@ export class ATProtoOAuthProvider {
 	 * Handle token request (POST /oauth/token)
 	 */
 	async handleToken(request: Request): Promise<Response> {
-		const result = await parseRequestBody(request);
-		if ("error" in result) {
-			return result.error;
+		let params: Record<string, string>;
+		try {
+			params = await parseRequestBody(request);
+		} catch (e) {
+			return oauthError("invalid_request", e instanceof Error ? e.message : "Invalid request");
 		}
-		const { params } = result;
 
 		const grantType = params.grant_type;
 

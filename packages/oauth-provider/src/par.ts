@@ -6,6 +6,7 @@
 import type { OAuthParResponse } from "@atproto/oauth-types";
 import type { OAuthStorage, PARData } from "./storage.js";
 import { randomString } from "./encoding.js";
+import { parseRequestBody } from "./provider.js";
 
 export type { OAuthParResponse };
 
@@ -62,31 +63,16 @@ export class PARHandler {
 	 * @returns Response with request_uri or error
 	 */
 	async handlePushRequest(request: Request): Promise<Response> {
-		// 1. Parse body based on content type
-		const contentType = request.headers.get("Content-Type") ?? "";
+		// 1. Parse body
 		let params: Record<string, string>;
-
 		try {
-			if (contentType.includes("application/json")) {
-				// Parse JSON body
-				const json = await request.json();
-				params = Object.fromEntries(
-					Object.entries(json as Record<string, unknown>).map(([k, v]) => [k, String(v)])
-				);
-			} else if (contentType.includes("application/x-www-form-urlencoded")) {
-				// Parse form body
-				const body = await request.text();
-				const urlParams = new URLSearchParams(body);
-				params = Object.fromEntries(urlParams.entries());
-			} else {
-				return this.errorResponse(
-					"invalid_request",
-					"Content-Type must be application/json or application/x-www-form-urlencoded",
-					400
-				);
-			}
-		} catch {
-			return this.errorResponse("invalid_request", "Failed to parse request body", 400);
+			params = await parseRequestBody(request);
+		} catch (e) {
+			return this.errorResponse(
+				"invalid_request",
+				e instanceof Error ? e.message : "Invalid request",
+				400
+			);
 		}
 
 		// 3. Validate client_id is present

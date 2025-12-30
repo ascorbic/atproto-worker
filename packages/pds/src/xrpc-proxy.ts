@@ -4,8 +4,8 @@
  */
 
 import type { Context } from "hono";
-import { DidResolver } from "@atproto/identity";
-import { getServiceEndpoint, type DidDocument } from "@atproto/common-web";
+import { DidResolver } from "./did-resolver";
+import { getServiceEndpoint } from "@atproto/common-web";
 import { createServiceJwt } from "./service-auth";
 import { verifyAccessToken } from "./session";
 import type { PDSEnv } from "./types";

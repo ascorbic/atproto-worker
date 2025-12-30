@@ -8,7 +8,7 @@ import { env as _env } from "cloudflare:workers";
 import { Secp256k1Keypair } from "@atproto/crypto";
 import { ensureValidDid, ensureValidHandle } from "@atproto/syntax";
 import { requireAuth } from "./middleware/auth";
-import { DidResolver } from "@atproto/identity";
+import { DidResolver } from "./did-resolver";
 import { WorkersDidCache } from "./did-cache";
 import { handleXrpcProxy } from "./xrpc-proxy";
 import * as sync from "./xrpc/sync";
@@ -49,7 +49,6 @@ try {
 	);
 }
 
-// DID resolver with caching using official @atproto/identity package
 const didResolver = new DidResolver({
 	didCache: new WorkersDidCache(),
 	timeout: 3000, // 3 second timeout for DID resolution

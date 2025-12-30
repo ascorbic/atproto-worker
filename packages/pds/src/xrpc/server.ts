@@ -231,11 +231,13 @@ export async function getAccountStatus(
 	accountDO: DurableObjectStub<AccountDurableObject>,
 ): Promise<Response> {
 	try {
-		// Check if repo exists
+		// Check if repo exists and get activation state
 		const status = await accountDO.rpcGetRepoStatus();
+		const active = await accountDO.rpcGetActive();
 
 		return c.json({
-			activated: true,
+			activated: active,
+			active: active,
 			validDid: true,
 			repoRev: status.rev,
 			repoBlocks: null, // Could implement block counting if needed
@@ -248,6 +250,7 @@ export async function getAccountStatus(
 		// If repo doesn't exist yet, return empty status
 		return c.json({
 			activated: false,
+			active: false,
 			validDid: true,
 			repoRev: null,
 			repoBlocks: null,
@@ -289,4 +292,46 @@ export async function getServiceAuth(
 	});
 
 	return c.json({ token });
+}
+
+/**
+ * Activate account - enables writes and firehose events
+ */
+export async function activateAccount(
+	c: Context<AuthedAppEnv>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	try {
+		await accountDO.rpcActivateAccount();
+		return c.json({ success: true });
+	} catch (err) {
+		return c.json(
+			{
+				error: "InternalServerError",
+				message: err instanceof Error ? err.message : "Unknown error",
+			},
+			500,
+		);
+	}
+}
+
+/**
+ * Deactivate account - disables writes while keeping reads available
+ */
+export async function deactivateAccount(
+	c: Context<AuthedAppEnv>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	try {
+		await accountDO.rpcDeactivateAccount();
+		return c.json({ success: true });
+	} catch (err) {
+		return c.json(
+			{
+				error: "InternalServerError",
+				message: err instanceof Error ? err.message : "Unknown error",
+			},
+			500,
+		);
+	}
 }

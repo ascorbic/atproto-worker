@@ -214,9 +214,15 @@ app.post("/xrpc/com.atproto.server.refreshSession", server.refreshSession);
 app.get("/xrpc/com.atproto.server.getSession", server.getSession);
 app.post("/xrpc/com.atproto.server.deleteSession", server.deleteSession);
 
-// Account migration
+// Account lifecycle
 app.get("/xrpc/com.atproto.server.getAccountStatus", requireAuth, (c) =>
 	server.getAccountStatus(c, getAccountDO(c.env)),
+);
+app.post("/xrpc/com.atproto.server.activateAccount", requireAuth, (c) =>
+	server.activateAccount(c, getAccountDO(c.env)),
+);
+app.post("/xrpc/com.atproto.server.deactivateAccount", requireAuth, (c) =>
+	server.deactivateAccount(c, getAccountDO(c.env)),
 );
 
 // Service auth - used by clients to get JWTs for external services (video, etc.)

@@ -66,8 +66,14 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			await this.ctx.blockConcurrencyWhile(async () => {
 				if (this.storageInitialized) return; // Double-check after acquiring lock
 
+				// Determine initial active state from env var (default true for new accounts)
+				const initialActive =
+					this.env.INITIAL_ACTIVE === undefined ||
+					this.env.INITIAL_ACTIVE === "true" ||
+					this.env.INITIAL_ACTIVE === "1";
+
 				this.storage = new SqliteRepoStorage(this.ctx.storage.sql);
-				this.storage.initSchema();
+				this.storage.initSchema(initialActive);
 				this.oauthStorage = new SqliteOAuthStorage(this.ctx.storage.sql);
 				this.oauthStorage.initSchema();
 				this.sequencer = new Sequencer(this.ctx.storage.sql);
@@ -128,6 +134,19 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	async getRepo(): Promise<Repo> {
 		await this.ensureRepoInitialized();
 		return this.repo!;
+	}
+
+	/**
+	 * Ensure the account is active. Throws error if deactivated.
+	 */
+	async ensureActive(): Promise<void> {
+		const storage = await this.getStorage();
+		const isActive = await storage.getActive();
+		if (!isActive) {
+			throw new Error(
+				"AccountDeactivated: Account is deactivated. Call activateAccount to enable writes.",
+			);
+		}
 	}
 
 	/**
@@ -263,6 +282,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		cid: string;
 		commit: { cid: string; rev: string };
 	}> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -336,6 +356,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		collection: string,
 		rkey: string,
 	): Promise<{ commit: { cid: string; rev: string } } | null> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -403,6 +424,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		commit: { cid: string; rev: string };
 		validationStatus: string;
 	}> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -497,6 +519,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			validationStatus?: string;
 		}>;
 	}> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -941,6 +964,30 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	async rpcPutPreferences(preferences: unknown[]): Promise<void> {
 		const storage = await this.getStorage();
 		await storage.putPreferences(preferences);
+	}
+
+	/**
+	 * RPC method: Get account activation state
+	 */
+	async rpcGetActive(): Promise<boolean> {
+		const storage = await this.getStorage();
+		return storage.getActive();
+	}
+
+	/**
+	 * RPC method: Activate account
+	 */
+	async rpcActivateAccount(): Promise<void> {
+		const storage = await this.getStorage();
+		await storage.setActive(true);
+	}
+
+	/**
+	 * RPC method: Deactivate account
+	 */
+	async rpcDeactivateAccount(): Promise<void> {
+		const storage = await this.getStorage();
+		await storage.setActive(false);
 	}
 
 	/**

@@ -18,8 +18,9 @@ export class SqliteRepoStorage
 
 	/**
 	 * Initialize the database schema. Should be called once on DO startup.
+	 * @param initialActive - Whether the account should start in active state (default true)
 	 */
-	initSchema(): void {
+	initSchema(initialActive: boolean = true): void {
 		this.sql.exec(`
 			-- Block storage (MST nodes + record blocks)
 			CREATE TABLE IF NOT EXISTS blocks (
@@ -35,12 +36,13 @@ export class SqliteRepoStorage
 				id INTEGER PRIMARY KEY CHECK (id = 1),
 				root_cid TEXT,
 				rev TEXT,
-				seq INTEGER NOT NULL DEFAULT 0
+				seq INTEGER NOT NULL DEFAULT 0,
+				active INTEGER NOT NULL DEFAULT 1
 			);
 
 			-- Initialize with empty state if not exists
-			INSERT OR IGNORE INTO repo_state (id, root_cid, rev, seq)
-			VALUES (1, NULL, NULL, 0);
+			INSERT OR IGNORE INTO repo_state (id, root_cid, rev, seq, active)
+			VALUES (1, NULL, NULL, 0, ${initialActive ? 1 : 0});
 
 			-- Firehose events (sequenced commit log)
 			CREATE TABLE IF NOT EXISTS firehose_events (
@@ -279,5 +281,25 @@ export class SqliteRepoStorage
 	async putPreferences(preferences: unknown[]): Promise<void> {
 		const data = JSON.stringify(preferences);
 		this.sql.exec("UPDATE preferences SET data = ? WHERE id = 1", data);
+	}
+
+	/**
+	 * Get the activation state of the account.
+	 */
+	async getActive(): Promise<boolean> {
+		const rows = this.sql
+			.exec("SELECT active FROM repo_state WHERE id = 1")
+			.toArray();
+		return rows.length > 0 ? ((rows[0]!.active as number) === 1) : true;
+	}
+
+	/**
+	 * Set the activation state of the account.
+	 */
+	async setActive(active: boolean): Promise<void> {
+		this.sql.exec(
+			"UPDATE repo_state SET active = ? WHERE id = 1",
+			active ? 1 : 0,
+		);
 	}
 }

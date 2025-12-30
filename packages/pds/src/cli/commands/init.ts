@@ -15,6 +15,7 @@ import {
 	promptPassword,
 	setSecretValue,
 } from "../utils/secrets.js";
+import { resolveHandleToDid } from "../utils/handle-resolver.js";
 
 /**
  * Run wrangler types to regenerate TypeScript types
@@ -76,45 +77,181 @@ export const initCommand = defineCommand({
 		// Use wrangler vars as primary source for public config
 		const currentVars = { ...devVars, ...wranglerVars };
 
-		// Prompt for hostname
-		const hostname = await p.text({
-			message: "PDS hostname:",
-			placeholder: "pds.example.com",
-			initialValue: currentVars.PDS_HOSTNAME || "",
-			validate: (v) => (!v ? "Hostname is required" : undefined),
+		// Ask if migrating an existing account
+		const isMigrating = await p.confirm({
+			message: "Are you migrating an existing Bluesky account?",
+			initialValue: false,
 		});
-		if (p.isCancel(hostname)) {
+		if (p.isCancel(isMigrating)) {
 			p.cancel("Cancelled");
 			process.exit(0);
 		}
 
-		// Prompt for handle
-		const handle = await p.text({
-			message: "Account handle:",
-			placeholder: "alice." + hostname,
-			initialValue: currentVars.HANDLE || "",
-			validate: (v) => (!v ? "Handle is required" : undefined),
-		});
-		if (p.isCancel(handle)) {
-			p.cancel("Cancelled");
-			process.exit(0);
-		}
+		let did: string;
+		let handle: string;
+		let hostname: string;
+		let initialActive: string;
 
-		// Prompt for DID
-		const didDefault = "did:web:" + hostname;
-		const did = await p.text({
-			message: "Account DID:",
-			placeholder: didDefault,
-			initialValue: currentVars.DID || didDefault,
-			validate: (v) => {
-				if (!v) return "DID is required";
-				if (!v.startsWith("did:")) return "DID must start with did:";
-				return undefined;
-			},
-		});
-		if (p.isCancel(did)) {
-			p.cancel("Cancelled");
-			process.exit(0);
+		if (isMigrating) {
+			p.log.info("Migration mode: Your account will start deactivated");
+			p.log.info(
+				"After setup, you'll need to: 1) Export data from old PDS, 2) Import to new PDS, 3) Update PLC directory, 4) Activate account",
+			);
+
+			// Get current handle to look up DID
+			const currentHandle = await p.text({
+				message: "Your current Bluesky handle:",
+				placeholder: "alice.bsky.social",
+				validate: (v) => (!v ? "Handle is required" : undefined),
+			});
+			if (p.isCancel(currentHandle)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			// Resolve handle to DID
+			const spinner = p.spinner();
+			spinner.start("Looking up your DID...");
+			const resolvedDid = await resolveHandleToDid(currentHandle as string);
+			spinner.stop("DID lookup complete");
+
+			if (!resolvedDid) {
+				p.log.error(`Failed to resolve handle ${currentHandle} to a DID`);
+				p.log.info(
+					"Please check your handle and try again, or enter your DID manually",
+				);
+				const manualDid = await p.text({
+					message: "Enter your DID manually (or press Ctrl+C to exit):",
+					placeholder: "did:plc:...",
+					validate: (v) => {
+						if (!v) return "DID is required";
+						if (!v.startsWith("did:")) return "DID must start with did:";
+						return undefined;
+					},
+				});
+				if (p.isCancel(manualDid)) {
+					p.cancel("Cancelled");
+					process.exit(0);
+				}
+				did = manualDid as string;
+			} else {
+				p.log.success(`Found DID: ${resolvedDid}`);
+				did = resolvedDid;
+			}
+
+			// Prompt for new PDS hostname
+			hostname = (await p.text({
+				message: "New PDS hostname (your domain):",
+				placeholder: "pds.example.com",
+				initialValue: currentVars.PDS_HOSTNAME || "",
+				validate: (v) => (!v ? "Hostname is required" : undefined),
+			})) as string;
+			if (p.isCancel(hostname)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			// For migration, keep the current handle initially
+			// (user will update it after PLC directory update)
+			handle = (await p.text({
+				message: "Account handle (can be updated after migration):",
+				placeholder: currentHandle as string,
+				initialValue: currentHandle as string,
+				validate: (v) => (!v ? "Handle is required" : undefined),
+			})) as string;
+			if (p.isCancel(handle)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			// Set to deactivated initially for migration
+			initialActive = "false";
+
+			p.note(
+				[
+					"After deploying, you'll need to:",
+					"",
+					"1. Export your data:",
+					`   curl "https://bsky.social/xrpc/com.atproto.sync.getRepo?did=${did}" -o repo.car`,
+					"",
+					"2. Import to your new PDS:",
+					`   curl -X POST -H "Authorization: Bearer $AUTH_TOKEN" \\`,
+					`     -H "Content-Type: application/vnd.ipld.car" \\`,
+					`     --data-binary @repo.car \\`,
+					`     "https://${hostname}/xrpc/com.atproto.repo.importRepo"`,
+					"",
+					"3. Update your PLC directory (requires email verification from old PDS)",
+					"",
+					"4. Activate your account:",
+					`   curl -X POST -H "Authorization: Bearer $AUTH_TOKEN" \\`,
+					`     "https://${hostname}/xrpc/com.atproto.server.activateAccount"`,
+				].join("\n"),
+				"Migration Steps",
+			);
+		} else {
+			// New account flow
+			p.log.info("New account mode: Your account will start active");
+
+			// Prompt for hostname
+			hostname = (await p.text({
+				message: "PDS hostname:",
+				placeholder: "pds.example.com",
+				initialValue: currentVars.PDS_HOSTNAME || "",
+				validate: (v) => (!v ? "Hostname is required" : undefined),
+			})) as string;
+			if (p.isCancel(hostname)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			// Prompt for handle
+			handle = (await p.text({
+				message: "Account handle:",
+				placeholder: "alice." + hostname,
+				initialValue: currentVars.HANDLE || "",
+				validate: (v) => (!v ? "Handle is required" : undefined),
+			})) as string;
+			if (p.isCancel(handle)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			// Prompt for DID
+			const didDefault = "did:web:" + hostname;
+			did = (await p.text({
+				message: "Account DID:",
+				placeholder: didDefault,
+				initialValue: currentVars.DID || didDefault,
+				validate: (v) => {
+					if (!v) return "DID is required";
+					if (!v.startsWith("did:")) return "DID must start with did:";
+					return undefined;
+				},
+			})) as string;
+			if (p.isCancel(did)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			// Active by default for new accounts
+			initialActive = "true";
+
+			p.note(
+				[
+					"For did:web to work, you'll need to serve your DID document at:",
+					`  https://${hostname}/.well-known/did.json`,
+					"",
+					"Your PDS will automatically serve this document.",
+					"",
+					"To set your handle, create a DNS TXT record:",
+					`  _atproto.${handle} TXT "did=${did}"`,
+					"",
+					"Or serve a file at:",
+					`  https://${handle}/.well-known/atproto-did`,
+					"  containing: ${did}",
+				].join("\n"),
+				"Identity Setup",
+			);
 		}
 
 		const spinner = p.spinner();
@@ -198,6 +335,7 @@ export const initCommand = defineCommand({
 			DID: did,
 			HANDLE: handle,
 			SIGNING_KEY_PUBLIC: signingKeyPublic,
+			INITIAL_ACTIVE: initialActive,
 		});
 		spinner.stop("wrangler.jsonc updated");
 
@@ -235,6 +373,7 @@ export const initCommand = defineCommand({
 				"  DID: " + did,
 				"  HANDLE: " + handle,
 				"  SIGNING_KEY_PUBLIC: " + signingKeyPublic,
+				"  INITIAL_ACTIVE: " + initialActive,
 				"",
 				isProduction
 					? "Secrets deployed to Cloudflare"

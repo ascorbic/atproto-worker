@@ -403,7 +403,7 @@ describe("Account Migration", () => {
 
 			expect(response.status).toBe(200);
 			const body = (await response.json()) as {
-				activated: boolean;
+				active: boolean;
 				validDid: boolean;
 				repoCommit: string;
 				repoRev: string;

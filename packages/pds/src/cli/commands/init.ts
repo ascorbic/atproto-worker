@@ -4,7 +4,26 @@
 import { defineCommand } from "citty";
 import { spawn } from "node:child_process";
 import * as p from "@clack/prompts";
-import { setVars, getVars, type SecretName } from "../utils/wrangler.js";
+import {
+	setVars,
+	getVars,
+	getWorkerName,
+	setWorkerName,
+	type SecretName,
+} from "../utils/wrangler.js";
+
+/**
+ * Slugify a handle to create a worker name
+ * e.g., "example.com" -> "example-com-pds"
+ */
+function slugifyHandle(handle: string): string {
+	return (
+		handle
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-|-$/g, "") + "-pds"
+	);
+}
 import { readDevVars } from "../utils/dotenv.js";
 import {
 	generateSigningKeypair,
@@ -16,6 +35,7 @@ import {
 	setSecretValue,
 } from "../utils/secrets.js";
 import { resolveHandleToDid } from "../utils/handle-resolver.js";
+import { DidResolver } from "../../did-resolver.js";
 
 /**
  * Run wrangler types to regenerate TypeScript types
@@ -63,11 +83,13 @@ export const initCommand = defineCommand({
 		},
 	},
 	async run({ args }) {
-		p.intro("PDS Setup Wizard");
+		p.intro("🦋 PDS Setup");
 
 		const isProduction = args.production;
 		if (isProduction) {
 			p.log.info("Production mode: secrets will be deployed via wrangler");
+		} else {
+			p.log.info("Let's set up your new home in the Atmosphere!");
 		}
 
 		// Get current config from both sources
@@ -79,27 +101,36 @@ export const initCommand = defineCommand({
 
 		// Ask if migrating an existing account
 		const isMigrating = await p.confirm({
-			message: "Are you migrating an existing Bluesky account?",
+			message: "Are you migrating an existing Bluesky account? 🦋",
 			initialValue: false,
 		});
 		if (p.isCancel(isMigrating)) {
-			p.cancel("Cancelled");
+			p.cancel("Setup cancelled");
 			process.exit(0);
 		}
 
 		let did: string;
 		let handle: string;
 		let hostname: string;
+		let workerName: string;
 		let initialActive: string;
 
+		const currentWorkerName = getWorkerName();
+
 		if (isMigrating) {
-			p.log.info("Migration mode: Your account will start deactivated");
+			p.log.info("Time to pack your bags! 🧳");
 			p.log.info(
-				"After setup, you'll need to: 1) Export data from old PDS, 2) Import to new PDS, 3) Update PLC directory, 4) Activate account",
+				"Your account will start deactivated until you've moved your data over.",
 			);
+
+			// Fallback hosted domains - will be updated from source PDS if possible
+			let hostedDomains = [".bsky.social", ".bsky.network", ".bsky.team"];
+			const isHostedHandle = (h: string) =>
+				hostedDomains.some((domain) => h.endsWith(domain));
 
 			// Loop to allow retry on failed handle resolution
 			let resolvedDid: string | null = null;
+			let existingHandle: string | null = null;
 			while (!resolvedDid) {
 				// Get current handle to look up DID
 				const currentHandle = await p.text({
@@ -111,14 +142,15 @@ export const initCommand = defineCommand({
 					p.cancel("Cancelled");
 					process.exit(0);
 				}
+				existingHandle = currentHandle as string;
 
 				// Resolve handle to DID
 				const spinner = p.spinner();
-				spinner.start("Looking up your DID...");
+				spinner.start("Finding you in the Atmosphere...");
 				resolvedDid = await resolveHandleToDid(currentHandle as string);
-				spinner.stop("DID lookup complete");
 
 				if (!resolvedDid) {
+					spinner.stop("Not found");
 					p.log.error(`Failed to resolve handle "${currentHandle}" to a DID`);
 
 					const action = await p.select({
@@ -151,16 +183,80 @@ export const initCommand = defineCommand({
 					}
 					// If action === "retry", loop continues with fresh handle prompt
 				} else {
-					p.log.success(`Found DID: ${resolvedDid}`);
+					// Try to get hosted domains from source PDS
+					try {
+						const didResolver = new DidResolver();
+						const didDoc = await didResolver.resolve(resolvedDid);
+						const pdsService = didDoc?.service?.find(
+							(s: { id: string; type: string }) =>
+								s.type === "AtprotoPersonalDataServer" ||
+								s.id === "#atproto_pds",
+						);
+						if (pdsService?.serviceEndpoint) {
+							const describeRes = await fetch(
+								`${pdsService.serviceEndpoint}/xrpc/com.atproto.server.describeServer`,
+							);
+							if (describeRes.ok) {
+								const desc = (await describeRes.json()) as {
+									availableUserDomains?: string[];
+								};
+								if (desc.availableUserDomains?.length) {
+									hostedDomains = desc.availableUserDomains.map((d) =>
+										d.startsWith(".") ? d : `.${d}`,
+									);
+								}
+							}
+						}
+					} catch {
+						// Ignore errors, use fallback domains
+					}
+					spinner.stop("Found you!");
+
+					p.log.success(`Found you! ${resolvedDid}`);
+					if (isHostedHandle(existingHandle!)) {
+						// Show the actual hosted domain they're on
+						const theirDomain = hostedDomains.find((d) =>
+							existingHandle!.endsWith(d),
+						);
+						const domainExample = theirDomain
+							? `*${theirDomain}`
+							: "*.bsky.social";
+						p.log.warn(
+							`You'll need a custom domain for your new handle (not ${domainExample}).`,
+						);
+					}
 				}
 			}
 			did = resolvedDid;
 
-			// Prompt for new PDS hostname
+			// Prompt for new handle first (right after the warning about hosted handles)
+			const defaultHandle =
+				existingHandle && !isHostedHandle(existingHandle)
+					? existingHandle
+					: currentVars.HANDLE || "";
+
+			handle = (await p.text({
+				message: "New account handle (must be a domain you control):",
+				placeholder: "example.com",
+				initialValue: defaultHandle,
+				validate: (v) => {
+					if (!v) return "Handle is required";
+					if (isHostedHandle(v)) {
+						return "You need a custom domain - hosted handles like *.bsky.social won't work";
+					}
+					return undefined;
+				},
+			})) as string;
+			if (p.isCancel(handle)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
+			// Prompt for PDS hostname - default to handle if it looks like a good PDS domain
 			hostname = (await p.text({
-				message: "New PDS hostname (your domain):",
-				placeholder: "pds.example.com",
-				initialValue: currentVars.PDS_HOSTNAME || "",
+				message: "Domain where you'll deploy your PDS:",
+				placeholder: handle,
+				initialValue: currentVars.PDS_HOSTNAME || handle,
 				validate: (v) => (!v ? "Hostname is required" : undefined),
 			})) as string;
 			if (p.isCancel(hostname)) {
@@ -168,47 +264,29 @@ export const initCommand = defineCommand({
 				process.exit(0);
 			}
 
-			// For migration, keep the current handle initially
-			// (user will update it after PLC directory update)
-			handle = (await p.text({
-				message: "Account handle (can be updated after migration):",
-				placeholder: hostname,
-				initialValue: hostname,
-				validate: (v) => (!v ? "Handle is required" : undefined),
+			// Prompt for worker name
+			const defaultWorkerName = currentWorkerName || slugifyHandle(handle);
+			workerName = (await p.text({
+				message: "Cloudflare Worker name:",
+				placeholder: defaultWorkerName,
+				initialValue: defaultWorkerName,
+				validate: (v) => {
+					if (!v) return "Worker name is required";
+					if (!/^[a-z0-9-]+$/.test(v))
+						return "Worker name can only contain lowercase letters, numbers, and hyphens";
+					return undefined;
+				},
 			})) as string;
-			if (p.isCancel(handle)) {
+			if (p.isCancel(workerName)) {
 				p.cancel("Cancelled");
 				process.exit(0);
 			}
 
 			// Set to deactivated initially for migration
 			initialActive = "false";
-
-			p.note(
-				[
-					"After deploying, you'll need to:",
-					"",
-					"1. Export your data:",
-					`   curl "https://bsky.social/xrpc/com.atproto.sync.getRepo?did=${did}" -o repo.car`,
-					"",
-					"2. Import to your new PDS:",
-					`   curl -X POST -H "Authorization: Bearer $AUTH_TOKEN" \\`,
-					`     -H "Content-Type: application/vnd.ipld.car" \\`,
-					`     --data-binary @repo.car \\`,
-					`     "https://${hostname}/xrpc/com.atproto.repo.importRepo"`,
-					"",
-					"3. Update your PLC directory (requires email verification from old PDS)",
-					"   See: https://atproto.com/guides/account-migration",
-					"",
-					"4. Activate your account:",
-					`   curl -X POST -H "Authorization: Bearer $AUTH_TOKEN" \\`,
-					`     "https://${hostname}/xrpc/com.atproto.server.activateAccount"`,
-				].join("\n"),
-				"Migration Steps",
-			);
 		} else {
 			// New account flow
-			p.log.info("New account mode: Your account will start active");
+			p.log.info("A fresh start in the Atmosphere! ✨");
 
 			// Prompt for hostname
 			hostname = (await p.text({
@@ -251,6 +329,24 @@ export const initCommand = defineCommand({
 				process.exit(0);
 			}
 
+			// Prompt for worker name
+			const defaultWorkerName = currentWorkerName || slugifyHandle(handle);
+			workerName = (await p.text({
+				message: "Cloudflare Worker name:",
+				placeholder: defaultWorkerName,
+				initialValue: defaultWorkerName,
+				validate: (v) => {
+					if (!v) return "Worker name is required";
+					if (!/^[a-z0-9-]+$/.test(v))
+						return "Worker name can only contain lowercase letters, numbers, and hyphens";
+					return undefined;
+				},
+			})) as string;
+			if (p.isCancel(workerName)) {
+				p.cancel("Cancelled");
+				process.exit(0);
+			}
+
 			// Active by default for new accounts
 			initialActive = "true";
 
@@ -261,20 +357,20 @@ export const initCommand = defineCommand({
 						"Your handle matches your PDS hostname, so your PDS will",
 						"automatically handle domain verification for you!",
 						"",
-						"For did:web to work, your PDS will serve the DID document at:",
+						"For did:web, your PDS serves the DID document at:",
 						`  https://${hostname}/.well-known/did.json`,
 						"",
-						"And for handle verification, it will serve:",
+						"For handle verification, it serves:",
 						`  https://${hostname}/.well-known/atproto-did`,
 						"",
-						"No additional DNS or hosting setup is needed.",
+						"No additional DNS or hosting setup needed. Easy! 🎉",
 					].join("\n"),
-					"Identity Setup",
+					"Identity Setup 🪪",
 				);
 			} else {
 				p.note(
 					[
-						"For did:web to work, your PDS will serve the DID document at:",
+						"For did:web, your PDS will serve the DID document at:",
 						`  https://${hostname}/.well-known/did.json`,
 						"",
 						"To verify your handle, create a DNS TXT record:",
@@ -284,7 +380,7 @@ export const initCommand = defineCommand({
 						`  https://${handle}/.well-known/atproto-did`,
 						`  containing: ${did}`,
 					].join("\n"),
-					"Identity Setup",
+					"Identity Setup 🪪",
 				);
 			}
 		}
@@ -333,7 +429,7 @@ export const initCommand = defineCommand({
 				"PASSWORD_HASH",
 				devVars,
 				async () => {
-					const password = await promptPassword();
+					const password = await promptPassword(handle);
 					spinner.start("Hashing password...");
 					const hash = await hashPassword(password);
 					spinner.stop("Password hashed");
@@ -342,7 +438,7 @@ export const initCommand = defineCommand({
 			);
 		} else {
 			// Local mode: always prompt for password and generate fresh secrets
-			const password = await promptPassword();
+			const password = await promptPassword(handle);
 
 			spinner.start("Hashing password...");
 			passwordHash = await hashPassword(password);
@@ -363,8 +459,9 @@ export const initCommand = defineCommand({
 			spinner.stop("Signing keypair generated");
 		}
 
-		// Always set public vars in wrangler.jsonc
+		// Always set public vars and worker name in wrangler.jsonc
 		spinner.start("Updating wrangler.jsonc...");
+		setWorkerName(workerName);
 		setVars({
 			PDS_HOSTNAME: hostname,
 			DID: did,
@@ -402,28 +499,68 @@ export const initCommand = defineCommand({
 
 		p.note(
 			[
-				"Configuration summary:",
-				"",
+				"  Worker name:  " + workerName,
 				"  PDS_HOSTNAME: " + hostname,
 				"  DID: " + did,
 				"  HANDLE: " + handle,
-				"  SIGNING_KEY_PUBLIC: " + signingKeyPublic,
+				"  SIGNING_KEY_PUBLIC: " + signingKeyPublic.slice(0, 20) + "...",
 				"  INITIAL_ACTIVE: " + initialActive,
 				"",
 				isProduction
-					? "Secrets deployed to Cloudflare"
+					? "Secrets deployed to Cloudflare ☁️"
 					: "Secrets saved to .dev.vars",
 				"",
 				"Auth token (save this!):",
 				"  " + authToken,
 			].join("\n"),
-			"Setup Complete",
+			"Your New Home 🏠",
 		);
 
-		if (isProduction) {
-			p.outro("Your PDS is configured! Run 'wrangler deploy' to deploy.");
+		// For local mode, offer to deploy secrets to Cloudflare
+		let deployedSecrets = isProduction;
+		if (!isProduction) {
+			const deployNow = await p.confirm({
+				message: "Push secrets to Cloudflare now?",
+				initialValue: false,
+			});
+
+			if (!p.isCancel(deployNow) && deployNow) {
+				spinner.start("Deploying secrets to Cloudflare...");
+				await setSecretValue("AUTH_TOKEN", authToken, false);
+				await setSecretValue("SIGNING_KEY", signingKey, false);
+				await setSecretValue("JWT_SECRET", jwtSecret, false);
+				await setSecretValue("PASSWORD_HASH", passwordHash, false);
+				spinner.stop("Secrets deployed to Cloudflare");
+				deployedSecrets = true;
+			}
+		}
+
+		if (isMigrating) {
+			p.note(
+				[
+					deployedSecrets
+						? "Deploy your worker and run the migration:"
+						: "Push secrets, deploy, and run the migration:",
+					"",
+					...(deployedSecrets ? [] : ["  pnpm pds init --production", ""]),
+					"  wrangler deploy",
+					"  pnpm pds migrate",
+					"",
+					"To test locally first:",
+					"  pnpm dev              # in one terminal",
+					"  pnpm pds migrate --dev  # in another",
+					"",
+					"Then update your identity and flip the switch! 🦋",
+					"  https://atproto.com/guides/account-migration",
+				].join("\n"),
+				"Next Steps 🧳",
+			);
+		}
+
+		if (deployedSecrets) {
+			p.outro("Run 'wrangler deploy' to launch your PDS! 🚀");
 		} else {
-			p.outro("Your PDS is configured! Run 'pnpm dev' to start locally.");
+			p.outro("Run 'pnpm dev' to start your PDS locally! 🦋");
 		}
 	},
 });

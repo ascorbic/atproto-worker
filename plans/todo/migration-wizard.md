@@ -1,11 +1,38 @@
 # Account Migration
 
-**Status:** 📋 Planning
+**Status:** ✅ Implemented
 **Priority:** P0 (Critical feature for user adoption)
 
 ## Overview
 
 A deploy-first approach where accounts start deactivated and are activated after importing data and updating identity.
+
+## CLI Migration Command
+
+The `pds migrate` command provides a delightful, whimsical UX for migrating your Bluesky account:
+
+```bash
+# Start the dev server in one terminal
+pnpm dev
+
+# Run migration in another terminal
+pnpm pds migrate
+
+# To reset and start fresh (only works on deactivated accounts)
+pnpm pds migrate --clean
+```
+
+### What it does:
+1. 🔍 Auto-detects your current PDS from your DID document
+2. 📦 Downloads your repository (posts, follows, likes)
+3. 🖼️ Transfers all your images
+4. 📊 Shows progress throughout
+
+### Features:
+- **Resumable** - Stop anytime, run again to continue
+- **Non-destructive** - Only works on deactivated accounts
+- **Progress tracking** - Shows exactly what's been transferred
+- **Whimsical UX** - 🦋 butterflies and "Atmosphere" references
 
 ## Core Concept: Deactivated Accounts
 
@@ -179,23 +206,19 @@ Account starts active (no deactivated state needed for new accounts).
 
 ## Endpoints Required
 
-### Already Implemented
+### All Implemented
 
 | Endpoint | Notes |
 |----------|-------|
-| `importRepo` | ✅ Complete |
-| `uploadBlob` | ✅ Complete |
-| `getAccountStatus` | ✅ Basic implementation |
-| `describeRepo` | ✅ Complete |
-| `getRepo` | ✅ Complete |
-
-### To Implement
-
-| Endpoint | Purpose |
-|----------|---------|
-| `activateAccount` | Transition deactivated → active |
-| `deactivateAccount` | Transition active → deactivated |
-| Enhanced `getAccountStatus` | Return activation state, import status |
+| `importRepo` | ✅ Import CAR file |
+| `uploadBlob` | ✅ Upload individual blobs |
+| `getAccountStatus` | ✅ Returns activation state + migration progress |
+| `describeRepo` | ✅ Repository metadata |
+| `getRepo` | ✅ Export as CAR |
+| `activateAccount` | ✅ Enable writes |
+| `deactivateAccount` | ✅ Disable writes |
+| `listMissingBlobs` | ✅ Track blob migration progress |
+| `gg.mk.experimental.resetMigration` | ✅ Reset to start fresh (deactivated only) |
 
 ### Not Needed
 
@@ -228,30 +251,35 @@ When account is deactivated, these operations should fail with error:
 - `uploadBlob`
 - `activateAccount`
 
-## CLI Tooling (Future)
+## CLI Tooling
 
-The deploy script (`create-pds`) should handle:
+### Implemented Commands
 
-1. **Interactive setup:**
-   - Prompt for domain
-   - Prompt for existing DID (migration) or generate new
-   - Generate secrets
-   - Deploy to Cloudflare
+| Command | Description |
+|---------|-------------|
+| `pnpm pds init` | Interactive setup wizard (handles migration mode) |
+| `pnpm pds migrate` | Transfer data from source PDS |
+| `pnpm pds migrate --clean` | Reset migration and start fresh |
+| `pnpm pds secret password` | Set account password |
+| `pnpm pds secret jwt` | Generate JWT secret |
+| `pnpm pds secret key` | Manage signing keys |
 
-2. **Migration helpers:**
-   - Export from old PDS
-   - Import to new PDS
-   - Validate import
-   - Guide through PLC update
+### Setup Flow
 
-3. **Commands:**
-   ```
-   npx create-pds my-pds              # New account
-   npx create-pds my-pds --migrate    # Migration mode
-   pnpm pds status                    # Check account status
-   pnpm pds activate                  # Activate account
-   pnpm pds validate                  # Run validation suite
-   ```
+```bash
+# Create new PDS project
+npx create-pds my-pds
+cd my-pds
+
+# Interactive setup (choose "migrating existing account")
+pnpm pds init
+
+# Start dev server
+pnpm dev
+
+# Run migration (in another terminal)
+pnpm pds migrate
+```
 
 ## Advantages Over Complex Wizard
 

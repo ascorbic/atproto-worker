@@ -56,29 +56,34 @@ export async function hashPassword(password: string): Promise<string> {
 /**
  * Prompt for password with confirmation
  */
-export async function promptPassword(): Promise<string> {
-	const password = await p.password({
-		message: "Enter password:",
-	});
-	if (p.isCancel(password)) {
-		p.cancel("Cancelled");
-		process.exit(0);
-	}
+export async function promptPassword(handle?: string): Promise<string> {
+	const message = handle
+		? `Choose a password for @${handle}:`
+		: "Enter password:";
 
-	const confirm = await p.password({
-		message: "Confirm password:",
-	});
-	if (p.isCancel(confirm)) {
-		p.cancel("Cancelled");
-		process.exit(0);
-	}
+	while (true) {
+		const password = await p.password({
+			message,
+		});
+		if (p.isCancel(password)) {
+			p.cancel("Cancelled");
+			process.exit(0);
+		}
 
-	if (password !== confirm) {
-		p.log.error("Passwords do not match");
-		process.exit(1);
-	}
+		const confirm = await p.password({
+			message: "Confirm password:",
+		});
+		if (p.isCancel(confirm)) {
+			p.cancel("Cancelled");
+			process.exit(0);
+		}
 
-	return password;
+		if (password === confirm) {
+			return password;
+		}
+
+		p.log.error("Passwords do not match. Try again.");
+	}
 }
 
 /**

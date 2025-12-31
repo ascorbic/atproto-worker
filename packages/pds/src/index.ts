@@ -230,6 +230,9 @@ app.post("/xrpc/com.atproto.server.activateAccount", requireAuth, (c) =>
 app.post("/xrpc/com.atproto.server.deactivateAccount", requireAuth, (c) =>
 	server.deactivateAccount(c, getAccountDO(c.env)),
 );
+app.post("/xrpc/gg.mk.experimental.resetMigration", requireAuth, (c) =>
+	server.resetMigration(c, getAccountDO(c.env)),
+);
 
 // Service auth - used by clients to get JWTs for external services (video, etc.)
 app.get(

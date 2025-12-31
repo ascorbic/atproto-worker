@@ -53,6 +53,25 @@ export function getVars(): Record<string, string> {
 }
 
 /**
+ * Get current worker name from wrangler config
+ */
+export function getWorkerName(): string | undefined {
+	const { rawConfig } = experimental_readRawConfig({});
+	return rawConfig.name as string | undefined;
+}
+
+/**
+ * Set worker name in wrangler config
+ */
+export function setWorkerName(name: string): void {
+	const { configPath } = experimental_readRawConfig({});
+	if (!configPath) {
+		throw new Error("No wrangler config found");
+	}
+	experimental_patchConfig(configPath, { name });
+}
+
+/**
  * Set a secret using wrangler secret put
  */
 export async function setSecret(

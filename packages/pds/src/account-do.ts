@@ -209,10 +209,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			return null;
 		}
 
-		const record = (await repo.getRecord(
-			collection,
-			rkey,
-		)) as Rpc.Serializable<any>;
+		const record = await repo.getRecord(collection, rkey);
 
 		if (!record) {
 			return null;
@@ -220,7 +217,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 
 		return {
 			cid: recordCid.toString(),
-			record,
+			record: serializeRecord(record) as Rpc.Serializable<any>,
 		};
 	}
 
@@ -251,7 +248,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			records.push({
 				uri: AtUri.make(repo.did, record.collection, record.rkey).toString(),
 				cid: record.cid.toString(),
-				value: record.record,
+				value: serializeRecord(record.record),
 			});
 
 			if (records.length >= opts.limit + 1) break;
@@ -753,9 +750,18 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		// Check if repo already exists
 		const existingRoot = await this.storage!.getRoot();
 		if (existingRoot) {
-			throw new Error(
-				"Repository already exists. Cannot import over existing repository.",
-			);
+			// Allow import over an "empty" repo (just initial commit) - this happens after init
+			// A fresh account from init has ~2 blocks; a real repo has many more
+			const blockCount = await this.storage!.countBlocks();
+			if (blockCount > 10) {
+				throw new Error(
+					"Repository already exists. Cannot import over existing repository.",
+				);
+			}
+			// Clear the empty repo to allow import
+			await this.storage!.destroy();
+			this.repo = null;
+			this.repoInitialized = false;
 		}
 
 		// Use official @atproto/repo utilities to read and validate CAR
@@ -769,6 +775,9 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		// Load the repo to verify it's valid and get the actual revision
 		this.keypair = await Secp256k1Keypair.import(this.env.SIGNING_KEY);
 		this.repo = await Repo.load(this.storage!, rootCid);
+
+		// Persist the root CID in storage so getRoot() works correctly
+		await this.storage!.updateRoot(rootCid, this.repo.commit.rev);
 
 		// Verify the DID matches to prevent incorrect migrations
 		if (this.repo.did !== this.env.DID) {
@@ -1087,6 +1096,41 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	}
 
 	/**
+	 * RPC method: Reset migration state.
+	 * Clears imported repo and blob tracking to allow re-import.
+	 * Only works when account is deactivated.
+	 */
+	async rpcResetMigration(): Promise<{
+		blocksDeleted: number;
+		blobsCleared: number;
+	}> {
+		const storage = await this.getStorage();
+
+		// Only allow reset on deactivated accounts
+		const isActive = await storage.getActive();
+		if (isActive) {
+			throw new Error(
+				"AccountActive: Cannot reset migration on an active account. Deactivate first.",
+			);
+		}
+
+		// Get counts before deletion for reporting
+		const blocksDeleted = await storage.countBlocks();
+		const blobsCleared = storage.countImportedBlobs();
+
+		// Clear all blocks and reset repo state
+		await storage.destroy();
+
+		// Clear blob tracking tables
+		storage.clearBlobTracking();
+
+		// Reset in-memory repo reference
+		this.repo = null;
+
+		return { blocksDeleted, blobsCleared };
+	}
+
+	/**
 	 * Emit an identity event to notify downstream services to refresh identity cache.
 	 */
 	async rpcEmitIdentityEvent(handle: string): Promise<{ seq: number }> {
@@ -1263,8 +1307,41 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 }
 
 /**
+ * Serialize a record for JSON by converting CID objects to { $link: "..." } format.
+ * CBOR-decoded records contain raw CID objects that need conversion for JSON serialization.
+ */
+function serializeRecord(obj: unknown): unknown {
+	if (obj === null || obj === undefined) return obj;
+
+	// Check if this is a CID object (has toV1() method which is characteristic of CID)
+	if (
+		typeof obj === "object" &&
+		obj !== null &&
+		"toV1" in obj &&
+		typeof (obj as { toV1: unknown }).toV1 === "function"
+	) {
+		return { $link: (obj as CID).toString() };
+	}
+
+	if (Array.isArray(obj)) {
+		return obj.map(serializeRecord);
+	}
+
+	if (typeof obj === "object") {
+		const result: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(obj)) {
+			result[key] = serializeRecord(value);
+		}
+		return result;
+	}
+
+	return obj;
+}
+
+/**
  * Extract blob CIDs from a record by recursively searching for blob references.
  * Blob refs have the structure: { $type: "blob", ref: { $link: "..." }, mimeType, size }
+ * Note: ref might be a CID object or already serialized as { $link: "..." }
  */
 function extractBlobCids(obj: unknown): string[] {
 	const cids: string[] = [];
@@ -1282,7 +1359,15 @@ function extractBlobCids(obj: unknown): string[] {
 				typeof record.ref === "object"
 			) {
 				const ref = record.ref as Record<string, unknown>;
-				if (typeof ref.$link === "string") {
+				// Handle both CID objects and serialized { $link: "..." } format
+				if (
+					"toV1" in ref &&
+					typeof (ref as { toV1: unknown }).toV1 === "function"
+				) {
+					// It's a CID object
+					cids.push((ref as CID).toString());
+				} else if (typeof ref.$link === "string") {
+					// It's already serialized
 					cids.push(ref.$link);
 				}
 			}

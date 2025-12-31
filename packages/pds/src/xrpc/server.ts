@@ -346,3 +346,39 @@ export async function deactivateAccount(
 		);
 	}
 }
+
+/**
+ * Reset migration state - clears imported repo and blob tracking.
+ * Only works on deactivated accounts.
+ */
+export async function resetMigration(
+	c: Context<AuthedAppEnv>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	try {
+		const result = await accountDO.rpcResetMigration();
+		return c.json(result);
+	} catch (err) {
+		const message = err instanceof Error ? err.message : "Unknown error";
+
+		// Check for specific error types
+		if (message.includes("AccountActive")) {
+			return c.json(
+				{
+					error: "AccountActive",
+					message:
+						"Cannot reset migration on an active account. Deactivate first.",
+				},
+				400,
+			);
+		}
+
+		return c.json(
+			{
+				error: "InternalServerError",
+				message,
+			},
+			500,
+		);
+	}
+}

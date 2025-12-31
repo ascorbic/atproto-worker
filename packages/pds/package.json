@@ -21,6 +21,7 @@
 	},
 	"dependencies": {
 		"@ascorbic/atproto-oauth-provider": "workspace:*",
+		"@atproto-labs/handle-resolver": "^0.3.4",
 		"@atproto/common-web": "^0.4.7",
 		"@atproto/crypto": "^0.4.5",
 		"@atproto/identity": "^0.4.10",

@@ -6,7 +6,12 @@ import { spawn } from "node:child_process";
 // Wrangler exports these experimental APIs for config manipulation
 import { experimental_patchConfig, experimental_readRawConfig } from "wrangler";
 
-export type VarName = "PDS_HOSTNAME" | "DID" | "HANDLE" | "SIGNING_KEY_PUBLIC";
+export type VarName =
+	| "PDS_HOSTNAME"
+	| "DID"
+	| "HANDLE"
+	| "SIGNING_KEY_PUBLIC"
+	| "INITIAL_ACTIVE";
 export type SecretName =
 	| "AUTH_TOKEN"
 	| "SIGNING_KEY"

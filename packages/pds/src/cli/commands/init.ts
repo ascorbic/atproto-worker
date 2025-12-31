@@ -98,46 +98,63 @@ export const initCommand = defineCommand({
 				"After setup, you'll need to: 1) Export data from old PDS, 2) Import to new PDS, 3) Update PLC directory, 4) Activate account",
 			);
 
-			// Get current handle to look up DID
-			const currentHandle = await p.text({
-				message: "Your current Bluesky handle:",
-				placeholder: "alice.bsky.social",
-				validate: (v) => (!v ? "Handle is required" : undefined),
-			});
-			if (p.isCancel(currentHandle)) {
-				p.cancel("Cancelled");
-				process.exit(0);
-			}
-
-			// Resolve handle to DID
-			const spinner = p.spinner();
-			spinner.start("Looking up your DID...");
-			const resolvedDid = await resolveHandleToDid(currentHandle as string);
-			spinner.stop("DID lookup complete");
-
-			if (!resolvedDid) {
-				p.log.error(`Failed to resolve handle ${currentHandle} to a DID`);
-				p.log.info(
-					"Please check your handle and try again, or enter your DID manually",
-				);
-				const manualDid = await p.text({
-					message: "Enter your DID manually (or press Ctrl+C to exit):",
-					placeholder: "did:plc:...",
-					validate: (v) => {
-						if (!v) return "DID is required";
-						if (!v.startsWith("did:")) return "DID must start with did:";
-						return undefined;
-					},
+			// Loop to allow retry on failed handle resolution
+			let resolvedDid: string | null = null;
+			while (!resolvedDid) {
+				// Get current handle to look up DID
+				const currentHandle = await p.text({
+					message: "Your current Bluesky handle:",
+					placeholder: "alice.bsky.social",
+					validate: (v) => (!v ? "Handle is required" : undefined),
 				});
-				if (p.isCancel(manualDid)) {
+				if (p.isCancel(currentHandle)) {
 					p.cancel("Cancelled");
 					process.exit(0);
 				}
-				did = manualDid as string;
-			} else {
-				p.log.success(`Found DID: ${resolvedDid}`);
-				did = resolvedDid;
+
+				// Resolve handle to DID
+				const spinner = p.spinner();
+				spinner.start("Looking up your DID...");
+				resolvedDid = await resolveHandleToDid(currentHandle as string);
+				spinner.stop("DID lookup complete");
+
+				if (!resolvedDid) {
+					p.log.error(`Failed to resolve handle "${currentHandle}" to a DID`);
+
+					const action = await p.select({
+						message: "What would you like to do?",
+						options: [
+							{ value: "retry", label: "Try a different handle" },
+							{ value: "manual", label: "Enter DID manually" },
+						],
+					});
+					if (p.isCancel(action)) {
+						p.cancel("Cancelled");
+						process.exit(0);
+					}
+
+					if (action === "manual") {
+						const manualDid = await p.text({
+							message: "Enter your DID:",
+							placeholder: "did:plc:...",
+							validate: (v) => {
+								if (!v) return "DID is required";
+								if (!v.startsWith("did:")) return "DID must start with did:";
+								return undefined;
+							},
+						});
+						if (p.isCancel(manualDid)) {
+							p.cancel("Cancelled");
+							process.exit(0);
+						}
+						resolvedDid = manualDid as string;
+					}
+					// If action === "retry", loop continues with fresh handle prompt
+				} else {
+					p.log.success(`Found DID: ${resolvedDid}`);
+				}
 			}
+			did = resolvedDid;
 
 			// Prompt for new PDS hostname
 			hostname = (await p.text({
@@ -155,8 +172,8 @@ export const initCommand = defineCommand({
 			// (user will update it after PLC directory update)
 			handle = (await p.text({
 				message: "Account handle (can be updated after migration):",
-				placeholder: currentHandle as string,
-				initialValue: currentHandle as string,
+				placeholder: hostname,
+				initialValue: hostname,
 				validate: (v) => (!v ? "Handle is required" : undefined),
 			})) as string;
 			if (p.isCancel(handle)) {
@@ -181,6 +198,7 @@ export const initCommand = defineCommand({
 					`     "https://${hostname}/xrpc/com.atproto.repo.importRepo"`,
 					"",
 					"3. Update your PLC directory (requires email verification from old PDS)",
+					"   See: https://atproto.com/guides/account-migration",
 					"",
 					"4. Activate your account:",
 					`   curl -X POST -H "Authorization: Bearer $AUTH_TOKEN" \\`,
@@ -204,11 +222,11 @@ export const initCommand = defineCommand({
 				process.exit(0);
 			}
 
-			// Prompt for handle
+			// Prompt for handle - default to hostname for simplicity
 			handle = (await p.text({
 				message: "Account handle:",
-				placeholder: "alice." + hostname,
-				initialValue: currentVars.HANDLE || "",
+				placeholder: hostname,
+				initialValue: currentVars.HANDLE || hostname,
 				validate: (v) => (!v ? "Handle is required" : undefined),
 			})) as string;
 			if (p.isCancel(handle)) {
@@ -236,22 +254,39 @@ export const initCommand = defineCommand({
 			// Active by default for new accounts
 			initialActive = "true";
 
-			p.note(
-				[
-					"For did:web to work, you'll need to serve your DID document at:",
-					`  https://${hostname}/.well-known/did.json`,
-					"",
-					"Your PDS will automatically serve this document.",
-					"",
-					"To set your handle, create a DNS TXT record:",
-					`  _atproto.${handle} TXT "did=${did}"`,
-					"",
-					"Or serve a file at:",
-					`  https://${handle}/.well-known/atproto-did`,
-					"  containing: ${did}",
-				].join("\n"),
-				"Identity Setup",
-			);
+			// Show different notes based on whether handle matches hostname
+			if (handle === hostname) {
+				p.note(
+					[
+						"Your handle matches your PDS hostname, so your PDS will",
+						"automatically handle domain verification for you!",
+						"",
+						"For did:web to work, your PDS will serve the DID document at:",
+						`  https://${hostname}/.well-known/did.json`,
+						"",
+						"And for handle verification, it will serve:",
+						`  https://${hostname}/.well-known/atproto-did`,
+						"",
+						"No additional DNS or hosting setup is needed.",
+					].join("\n"),
+					"Identity Setup",
+				);
+			} else {
+				p.note(
+					[
+						"For did:web to work, your PDS will serve the DID document at:",
+						`  https://${hostname}/.well-known/did.json`,
+						"",
+						"To verify your handle, create a DNS TXT record:",
+						`  _atproto.${handle} TXT "did=${did}"`,
+						"",
+						"Or serve a file at:",
+						`  https://${handle}/.well-known/atproto-did`,
+						`  containing: ${did}`,
+					].join("\n"),
+					"Identity Setup",
+				);
+			}
 		}
 
 		const spinner = p.spinner();

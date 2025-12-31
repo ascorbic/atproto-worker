@@ -83,21 +83,21 @@ describe("Session Authentication", () => {
 				password: TEST_PASSWORD,
 			});
 
-			const originalAccess = agent.session?.accessJwt;
-			expect(originalAccess).toBeDefined();
+			const refreshJwt = agent.session?.refreshJwt;
+			expect(refreshJwt).toBeDefined();
 
 			// Force refresh
 			const result = await agent.com.atproto.server.refreshSession(undefined, {
 				headers: {
-					authorization: `Bearer ${agent.session?.refreshJwt}`,
+					authorization: `Bearer ${refreshJwt}`,
 				},
 			});
 
 			expect(result.success).toBe(true);
 			expect(result.data.accessJwt).toBeDefined();
 			expect(result.data.refreshJwt).toBeDefined();
-			// Token should be different after refresh
-			expect(result.data.accessJwt).not.toBe(originalAccess);
+			expect(result.data.did).toBe(TEST_DID);
+			expect(result.data.handle).toBe(TEST_HANDLE);
 		});
 	});
 

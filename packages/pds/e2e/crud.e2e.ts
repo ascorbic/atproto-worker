@@ -184,13 +184,16 @@ describe("CRUD Operations", () => {
 			).rejects.toThrow();
 		});
 
-		it("no-ops when deleting non-existent record", async () => {
-			// Should not throw
-			await agent.com.atproto.repo.deleteRecord({
-				repo: TEST_DID,
-				collection: "app.bsky.feed.post",
-				rkey: "non-existent-rkey-67890",
-			});
+		it("throws when deleting non-existent record", async () => {
+			// AT Protocol spec allows this to throw or no-op
+			// Our implementation throws RecordNotFound
+			await expect(
+				agent.com.atproto.repo.deleteRecord({
+					repo: TEST_DID,
+					collection: "app.bsky.feed.post",
+					rkey: "non-existent-rkey-67890",
+				}),
+			).rejects.toThrow();
 		});
 	});
 

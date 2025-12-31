@@ -19,7 +19,7 @@ export function uniqueRkey(): string {
 	return `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export const TEST_DID = "did:web:localhost";
-export const TEST_HANDLE = "localhost";
+export const TEST_DID = "did:web:test.local";
+export const TEST_HANDLE = "test.local";
 export const TEST_PASSWORD = "test-password"; // Matches PASSWORD_HASH in .dev.vars
 export const TEST_AUTH_TOKEN = "test-token";

@@ -442,7 +442,7 @@ export const migrateCommand = defineCommand({
 				process.exit(1);
 			}
 
-			spinner.start("Unpacking at localhost:5173...");
+			spinner.start(`Unpacking at ${targetDomain}...`);
 			try {
 				await targetClient.importRepo(carBytes);
 				spinner.stop("Repository imported");
@@ -462,9 +462,9 @@ export const migrateCommand = defineCommand({
 		// ============================================
 		// Step 8: Sync blobs
 		// ============================================
-		const totalBlobs = status.expectedBlobs;
+		const expectedBlobs = status.expectedBlobs;
 		const alreadyImported = status.importedBlobs;
-		const blobsToSync = totalBlobs - alreadyImported;
+		const blobsToSync = expectedBlobs - alreadyImported;
 
 		if (blobsToSync > 0) {
 			let synced = 0;

@@ -364,6 +364,24 @@ export class PDSClient {
 		});
 	}
 
+	/**
+	 * Activate account to enable writes
+	 */
+	async activateAccount(): Promise<void> {
+		await this.xrpc("POST", "com.atproto.server.activateAccount", {
+			auth: true,
+		});
+	}
+
+	/**
+	 * Deactivate account to disable writes
+	 */
+	async deactivateAccount(): Promise<void> {
+		await this.xrpc("POST", "com.atproto.server.deactivateAccount", {
+			auth: true,
+		});
+	}
+
 	// ============================================
 	// Health Check
 	// ============================================

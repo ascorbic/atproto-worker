@@ -6,6 +6,8 @@ import { defineCommand, runMain } from "citty";
 import { secretCommand } from "./commands/secret/index.js";
 import { initCommand } from "./commands/init.js";
 import { migrateCommand } from "./commands/migrate.js";
+import { activateCommand } from "./commands/activate.js";
+import { deactivateCommand } from "./commands/deactivate.js";
 
 const main = defineCommand({
 	meta: {
@@ -17,6 +19,8 @@ const main = defineCommand({
 		init: initCommand,
 		secret: secretCommand,
 		migrate: migrateCommand,
+		activate: activateCommand,
+		deactivate: deactivateCommand,
 	},
 });
 

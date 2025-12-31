@@ -318,13 +318,12 @@ describe("Account Migration", () => {
 			);
 
 			// Get the repo status to find the head CID
-			const statusResponse = await worker.fetch(
+			await worker.fetch(
 				new Request(
 					`http://pds.test/xrpc/com.atproto.sync.getRepoStatus?did=${env.DID}`,
 				),
 				env,
 			);
-			const status = (await statusResponse.json()) as { rev: string };
 
 			// Now get the blocks using a made-up CID (won't find the block, but should return valid CAR)
 			const response = await worker.fetch(
@@ -494,4 +493,163 @@ describe("Account Migration", () => {
 			// But we've verified the export produces a valid CAR file
 		});
 	});
+
+	describe("com.atproto.server.activateAccount", () => {
+		it("requires authentication", async () => {
+			const response = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.activateAccount`, {
+					method: "POST",
+				}),
+				env,
+			);
+
+			expect(response.status).toBe(401);
+			const body = (await response.json()) as Record<string, unknown>;
+			expect(body.error).toBe("AuthMissing");
+		});
+
+		it("activates a deactivated account", async () => {
+			// First deactivate
+			const deactivateResponse = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.deactivateAccount`, {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+				}),
+				env,
+			);
+			expect(deactivateResponse.ok).toBe(true);
+
+			// Verify deactivated
+			const statusResponse1 = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.getAccountStatus`, {
+					headers: {
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+				}),
+				env,
+			);
+			const status1 = (await statusResponse1.json()) as { active: boolean };
+			expect(status1.active).toBe(false);
+
+			// Activate
+			const activateResponse = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.activateAccount`, {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+				}),
+				env,
+			);
+
+			expect(activateResponse.ok).toBe(true);
+			const result = (await activateResponse.json()) as { success: boolean };
+			expect(result.success).toBe(true);
+
+			// Verify activated
+			const statusResponse2 = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.getAccountStatus`, {
+					headers: {
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+				}),
+				env,
+			);
+			const status2 = (await statusResponse2.json()) as { active: boolean };
+			expect(status2.active).toBe(true);
+		});
+	});
+
+	describe("com.atproto.server.deactivateAccount", () => {
+		it("requires authentication", async () => {
+			const response = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.deactivateAccount`, {
+					method: "POST",
+				}),
+				env,
+			);
+
+			expect(response.status).toBe(401);
+			const body = (await response.json()) as Record<string, unknown>;
+			expect(body.error).toBe("AuthMissing");
+		});
+
+		it("deactivates an active account", async () => {
+			// Create a record to ensure account is active
+			await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.repo.createRecord`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+					body: JSON.stringify({
+						repo: env.DID,
+						collection: "app.bsky.feed.post",
+						record: {
+							$type: "app.bsky.feed.post",
+							text: "Test post",
+							createdAt: new Date().toISOString(),
+						},
+					}),
+				}),
+				env,
+			);
+
+			// Deactivate
+			const deactivateResponse = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.deactivateAccount`, {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+				}),
+				env,
+			);
+
+			expect(deactivateResponse.ok).toBe(true);
+			const result = (await deactivateResponse.json()) as { success: boolean };
+			expect(result.success).toBe(true);
+
+			// Verify deactivated
+			const statusResponse = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.server.getAccountStatus`, {
+					headers: {
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+				}),
+				env,
+			);
+			const status = (await statusResponse.json()) as { active: boolean };
+			expect(status.active).toBe(false);
+
+			// Verify writes are blocked
+			const createResponse = await worker.fetch(
+				new Request(`http://pds.test/xrpc/com.atproto.repo.createRecord`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+					},
+					body: JSON.stringify({
+						repo: env.DID,
+						collection: "app.bsky.feed.post",
+						record: {
+							$type: "app.bsky.feed.post",
+							text: "Should fail",
+							createdAt: new Date().toISOString(),
+						},
+					}),
+				}),
+				env,
+			);
+
+			expect(createResponse.ok).toBe(false);
+			const errorBody = (await createResponse.json()) as { error: string };
+			expect(errorBody.error).toBe("InternalServerError");
+		});
+	});
 });
+

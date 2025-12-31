@@ -18,6 +18,8 @@ export default defineConfig({
 					JWT_SECRET: "test-jwt-secret-at-least-32-chars-long",
 					PASSWORD_HASH:
 						"$2b$10$B6MKXNJ33Co3RoIVYAAvvO3jImuMiqL1T1YnFDN7E.hTZLtbB4SW6",
+					// Start accounts active by default in tests
+					INITIAL_ACTIVE: "true",
 				},
 			},
 		}),

@@ -210,9 +210,7 @@ export const initCommand = defineCommand({
 					} catch {
 						// Ignore errors, use fallback domains
 					}
-					spinner.stop("Found you!");
-
-					p.log.success(`Found you! ${resolvedDid}`);
+					spinner.stop(`Found you! ${resolvedDid}`);
 					if (isHostedHandle(existingHandle!)) {
 						// Show the actual hosted domain they're on
 						const theirDomain = hostedDomains.find((d) =>

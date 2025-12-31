@@ -1,7 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { env, worker } from "./helpers";
 
 describe("Account Migration", () => {
+	// Ensure account is activated after each test to prevent state leakage
+	afterEach(async () => {
+		// Reactivate account to clean up state
+		await worker.fetch(
+			new Request(`http://pds.test/xrpc/com.atproto.server.activateAccount`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${env.AUTH_TOKEN}`,
+				},
+			}),
+			env,
+		);
+	});
 	describe("com.atproto.server.getAccountStatus", () => {
 		it("requires authentication", async () => {
 			const response = await worker.fetch(
@@ -647,8 +660,7 @@ describe("Account Migration", () => {
 			);
 
 			expect(createResponse.ok).toBe(false);
-			const errorBody = (await createResponse.json()) as { error: string };
-			expect(errorBody.error).toBe("InternalServerError");
+		expect(createResponse.status).toBe(500);
 		});
 	});
 });

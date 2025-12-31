@@ -747,18 +747,19 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	}> {
 		await this.ensureStorageInitialized();
 
-		// Check if repo already exists
+		// Check if account is active - only allow imports on deactivated accounts
+		const isActive = await this.storage!.getActive();
 		const existingRoot = await this.storage!.getRoot();
+
+		if (isActive && existingRoot) {
+			// Account is active - reject import to prevent accidental overwrites
+			throw new Error(
+				"Repository already exists. Cannot import over existing repository.",
+			);
+		}
+
+		// If deactivated and repo exists, clear it first
 		if (existingRoot) {
-			// Allow import over an "empty" repo (just initial commit) - this happens after init
-			// A fresh account from init has ~2 blocks; a real repo has many more
-			const blockCount = await this.storage!.countBlocks();
-			if (blockCount > 10) {
-				throw new Error(
-					"Repository already exists. Cannot import over existing repository.",
-				);
-			}
-			// Clear the empty repo to allow import
 			await this.storage!.destroy();
 			this.repo = null;
 			this.repoInitialized = false;

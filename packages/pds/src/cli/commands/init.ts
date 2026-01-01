@@ -147,7 +147,7 @@ export const initCommand = defineCommand({
 		if (isMigrating) {
 			p.log.info("Time to pack your bags! 🧳");
 			p.log.info(
-				"Your new account will be inactive until you've ready to go live.",
+				"Your new account will be inactive until you're ready to go live.",
 			);
 
 			// Fallback hosted domains - will be updated from source PDS if possible

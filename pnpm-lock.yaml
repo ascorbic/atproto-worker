@@ -49,8 +49,8 @@ importers:
   packages/create-pds:
     devDependencies:
       '@clack/prompts':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: 1.0.0-alpha.9
+        version: 1.0.0-alpha.9
       '@types/node':
         specifier: ^24.10.4
         version: 24.10.4
@@ -131,8 +131,8 @@ importers:
         specifier: ^0.4.2
         version: 0.4.2
       '@clack/prompts':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: 1.0.0-alpha.9
+        version: 1.0.0-alpha.9
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -365,18 +365,18 @@ packages:
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
 
-  '@clack/core@0.5.0':
-    resolution: {integrity: sha512-p3y0FIOwaYRUPRcMO7+dlmLh8PSRcrjuTndsiA0WAFbWES0mLZlrjVoBRZ9DzkPFJZG6KGkJmoEAY0ZcVWTkow==}
+  '@clack/core@1.0.0-alpha.7':
+    resolution: {integrity: sha512-3vdh6Ar09D14rVxJZIm3VQJkU+ZOKKT5I5cC0cOVazy70CNyYYjiwRj9unwalhESndgxx6bGc/m6Hhs4EKF5XQ==}
 
-  '@clack/prompts@0.11.0':
-    resolution: {integrity: sha512-pMN5FcrEw9hUkZA4f+zLlzivQSeQf5dRGJjSUbvVYDLvpKCdQx5OaknvKzgbtXOizhP+SJJJjqEbOe55uKKfAw==}
+  '@clack/prompts@1.0.0-alpha.9':
+    resolution: {integrity: sha512-sKs0UjiHFWvry4SiRfBi5Qnj0C/6AYx8aKkFPZQSuUZXgAram25ZDmhQmP7vj1aFyLpfHWtLQjWvOvcat0TOLg==}
 
   '@cloudflare/kv-asset-handler@0.4.1':
     resolution: {integrity: sha512-Nu8ahitGFFJztxUml9oD/DLb7Z28C8cd8F46IVQ7y5Btz575pvMY8AqZsXkX7Gds29eCKdMgIHjIvzskHgPSFg==}
     engines: {node: '>=18.0.0'}
 
   '@cloudflare/kv-asset-handler@https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/kv-asset-handler@64982d4':
-    resolution: {tarball: https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/kv-asset-handler@64982d4}
+    resolution: {integrity: sha512-A1qPBLIb6J9iKy2M8X/ywh4e9jyHsAucJZVPNqCHdHrkeJIUntVfozazCZj9Sdm+rr4om20toCQgoxRPQtlWLQ==, tarball: https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/kv-asset-handler@64982d4}
     version: 0.4.1
     engines: {node: '>=18.0.0'}
 
@@ -390,7 +390,7 @@ packages:
         optional: true
 
   '@cloudflare/unenv-preset@https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/unenv-preset@64982d4':
-    resolution: {tarball: https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/unenv-preset@64982d4}
+    resolution: {integrity: sha512-WXbktS8e26BzZjbqQL2syj9UTC4+8zdEIbRQ8hsVxsAp6bES9q9lkyGnreX9Ax/2ENWpc0VFidwq/k3M9MNkqA==, tarball: https://pkg.pr.new/cloudflare/workers-sdk/@cloudflare/unenv-preset@64982d4}
     version: 2.7.13
     peerDependencies:
       unenv: 2.0.0-rc.24
@@ -406,7 +406,7 @@ packages:
       wrangler: ^4.53.0
 
   '@cloudflare/vitest-pool-workers@https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632':
-    resolution: {tarball: https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632}
+    resolution: {integrity: sha512-bUcBi9IflGaKQGFyxjyluNfZ4Wi+0jJzz2SMwWpHGqTPtfLJqfGv3VhfpecEE2Dir6Vohtn7Frs8uiIVThM9JA==, tarball: https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632}
     version: 0.11.1
     peerDependencies:
       '@vitest/runner': 4.0.16
@@ -1948,7 +1948,7 @@ packages:
     hasBin: true
 
   miniflare@https://pkg.pr.new/cloudflare/workers-sdk/miniflare@64982d4:
-    resolution: {tarball: https://pkg.pr.new/cloudflare/workers-sdk/miniflare@64982d4}
+    resolution: {integrity: sha512-HygCuVJoQbUVyHBGRtvF3LorrbqWavL1R1gXhYJqaenbPYuP2d//2zp3zmYPF2yRkaTzVg/NDqN9BlaU6/btoA==, tarball: https://pkg.pr.new/cloudflare/workers-sdk/miniflare@64982d4}
     version: 4.20251217.0
     engines: {node: '>=18.0.0'}
     hasBin: true
@@ -2613,7 +2613,7 @@ packages:
         optional: true
 
   wrangler@https://pkg.pr.new/cloudflare/workers-sdk/wrangler@64982d4:
-    resolution: {tarball: https://pkg.pr.new/cloudflare/workers-sdk/wrangler@64982d4}
+    resolution: {integrity: sha512-x/FjewjH8KL8s4w09157cJOPpY/ovh9fPJQ8VTFA6ncxsi1BZrk/N2aRZqh8l6M2x58z+w4J6VbDtgBkE7pXnA==, tarball: https://pkg.pr.new/cloudflare/workers-sdk/wrangler@64982d4}
     version: 4.56.0
     engines: {node: '>=20.0.0'}
     hasBin: true
@@ -3020,14 +3020,14 @@ snapshots:
       human-id: 4.1.1
       prettier: 2.8.8
 
-  '@clack/core@0.5.0':
+  '@clack/core@1.0.0-alpha.7':
     dependencies:
       picocolors: 1.1.1
       sisteransi: 1.0.5
 
-  '@clack/prompts@0.11.0':
+  '@clack/prompts@1.0.0-alpha.9':
     dependencies:
-      '@clack/core': 0.5.0
+      '@clack/core': 1.0.0-alpha.7
       picocolors: 1.1.1
       sisteransi: 1.0.5
 

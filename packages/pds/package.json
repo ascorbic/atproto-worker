@@ -32,7 +32,7 @@
 		"@atproto/lexicon": "^0.6.0",
 		"@atproto/repo": "^0.8.12",
 		"@atproto/syntax": "^0.4.2",
-		"@clack/prompts": "^0.11.0",
+		"@clack/prompts": "1.0.0-alpha.9",
 		"bcryptjs": "^3.0.3",
 		"citty": "^0.1.6",
 		"hono": "^4.11.3",

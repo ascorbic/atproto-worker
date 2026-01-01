@@ -457,14 +457,6 @@ export const migrateCommand = defineCommand({
 			let cursor: string | undefined;
 			let failedBlobs: string[] = [];
 
-			const progressBar = (current: number, total: number): string => {
-				const width = 20;
-				const ratio = total > 0 ? Math.min(1, current / total) : 0;
-				const filled = Math.round(ratio * width);
-				const empty = width - filled;
-				return `${"█".repeat(filled)}${"░".repeat(empty)} ${current}/${total}`;
-			};
-
 			// First, count total missing blobs
 			spinner.start("Counting images to transfer...");
 			let countCursor: string | undefined;
@@ -474,7 +466,11 @@ export const migrateCommand = defineCommand({
 				countCursor = page.cursor;
 			} while (countCursor);
 
-			spinner.message(`Transferring images ${progressBar(0, totalBlobs)}`);
+			spinner.stop(`Found ${formatNumber(totalBlobs)} images to transfer`);
+
+			// Use clack progress bar for transferring
+			const progressBar = p.progress({ max: totalBlobs });
+			progressBar.start("Transferring images");
 
 			do {
 				const page = await targetClient.listMissingBlobs(100, cursor);
@@ -488,26 +484,22 @@ export const migrateCommand = defineCommand({
 						);
 						await targetClient.uploadBlob(bytes, mimeType);
 						synced++;
-						spinner.message(
-							`Transferring images ${progressBar(synced, totalBlobs)}`,
-						);
+						progressBar.advance(1);
 					} catch (err) {
 						synced++;
 						failedBlobs.push(blob.cid);
-						spinner.message(
-							`Transferring images ${progressBar(synced, totalBlobs)}`,
-						);
+						progressBar.advance(1);
 					}
 				}
 			} while (cursor);
 
 			if (failedBlobs.length > 0) {
-				spinner.stop(
+				progressBar.stop(
 					`Transferred ${formatNumber(synced - failedBlobs.length)} images (${failedBlobs.length} failed)`,
 				);
 				p.log.warn(`Run 'pds migrate' again to retry failed transfers.`);
 			} else {
-				spinner.stop(`Transferred ${formatNumber(synced)} images`);
+				progressBar.stop(`Transferred ${formatNumber(synced)} images`);
 			}
 		}
 

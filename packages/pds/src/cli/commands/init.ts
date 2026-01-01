@@ -120,7 +120,7 @@ export const initCommand = defineCommand({
 		if (isMigrating) {
 			p.log.info("Time to pack your bags! 🧳");
 			p.log.info(
-				"Your account will start deactivated until you've moved your data over.",
+				"Your account will be inactive until you've moved your data over.",
 			);
 
 			// Fallback hosted domains - will be updated from source PDS if possible
@@ -138,8 +138,8 @@ export const initCommand = defineCommand({
 				attempts++;
 				// Get current handle to look up DID
 				const currentHandle = await p.text({
-					message: "Your current Bluesky handle:",
-					placeholder: "alice.bsky.social",
+					message: "Your current Bluesky/ATProto handle:",
+					placeholder: "example.bsky.social",
 					validate: (v) => (!v ? "Handle is required" : undefined),
 				});
 				if (p.isCancel(currentHandle)) {
@@ -155,7 +155,7 @@ export const initCommand = defineCommand({
 
 				if (!resolvedDid) {
 					spinner.stop("Not found");
-					p.log.error(`Failed to resolve handle "${currentHandle}" to a DID`);
+					p.log.error(`Failed to resolve handle "${currentHandle}"`);
 
 					const action = await p.select({
 						message: "What would you like to do?",
@@ -224,22 +224,22 @@ export const initCommand = defineCommand({
 							? `*${theirDomain}`
 							: "*.bsky.social";
 						p.log.warn(
-							`You'll need a custom domain for your new handle (not ${domainExample}).`,
+							`You'll need a custom domain for your new handle (not ${domainExample}). You can set this up after transferring your data.`,
 						);
 					}
-				if (attempts >= MAX_ATTEMPTS) {
-					p.log.error("Unable to resolve handle after 3 attempts.");
-					p.log.info("");
-					p.log.info("You can:");
-					p.log.info("  1. Double-check your handle spelling");
-					p.log.info("  2. Provide your DID directly if you know it");
-					p.log.info("  3. Run 'pds init' again when ready");
-					p.outro("Initialization cancelled.");
-					process.exit(1);
-				}
+					if (attempts >= MAX_ATTEMPTS) {
+						p.log.error("Unable to resolve handle after 3 attempts.");
+						p.log.info("");
+						p.log.info("You can:");
+						p.log.info("  1. Double-check your handle spelling");
+						p.log.info("  2. Provide your DID directly if you know it");
+						p.log.info("  3. Run 'pds init' again when ready");
+						p.outro("Initialization cancelled.");
+						process.exit(1);
+					}
 				}
 			}
-			did = resolvedDid;
+			did = resolvedDid!;
 
 			// Prompt for new handle first (right after the warning about hosted handles)
 			const defaultHandle =
@@ -302,7 +302,7 @@ export const initCommand = defineCommand({
 
 			// Prompt for hostname
 			hostname = (await p.text({
-				message: "PDS hostname:",
+				message: "Domain where you'll deploy your PDS:",
 				placeholder: "pds.example.com",
 				initialValue: currentVars.PDS_HOSTNAME || "",
 				validate: (v) => (!v ? "Hostname is required" : undefined),
@@ -512,11 +512,10 @@ export const initCommand = defineCommand({
 		p.note(
 			[
 				"  Worker name:  " + workerName,
-				"  PDS_HOSTNAME: " + hostname,
+				"  PDS hostname: " + hostname,
 				"  DID: " + did,
-				"  HANDLE: " + handle,
-				"  SIGNING_KEY_PUBLIC: " + signingKeyPublic.slice(0, 20) + "...",
-				"  INITIAL_ACTIVE: " + initialActive,
+				"  Handle: " + handle,
+				"  Public signing key: " + signingKeyPublic.slice(0, 20) + "...",
 				"",
 				isProduction
 					? "Secrets deployed to Cloudflare ☁️"

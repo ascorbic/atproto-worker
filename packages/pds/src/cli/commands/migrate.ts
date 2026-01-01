@@ -11,11 +11,21 @@ import { PDSClient, PDSClientError } from "../utils/pds-client.js";
 import { DidResolver } from "../../did-resolver.js";
 
 import { getTargetUrl, getDomain } from "../utils/cli-helpers.js";
+import { getPdsEndpoint } from "@atproto/common-web";
+type PackageManager = "npm" | "yarn" | "pnpm" | "bun";
+
+function detectPackageManager(): PackageManager {
+	const userAgent = process.env.npm_config_user_agent || "";
+	if (userAgent.startsWith("yarn")) return "yarn";
+	if (userAgent.startsWith("pnpm")) return "pnpm";
+	if (userAgent.startsWith("bun")) return "bun";
+	return "npm";
+}
 
 // Helper to override clack's dim styling in notes
-const brightNote = (lines: string[]) => lines.map((l) => `\x1b[0m${l}`).join("\n");
+const brightNote = (lines: string[]) =>
+	lines.map((l) => `\x1b[0m${l}`).join("\n");
 const bold = (text: string) => pc.bold(text);
-
 
 /**
  * Format number with commas
@@ -170,9 +180,7 @@ export const migrateCommand = defineCommand({
 		if (args.clean) {
 			if (status.active) {
 				p.log.error("Cannot reset: account is active");
-				p.log.info(
-					"The --clean flag only works on deactivated accounts.",
-				);
+				p.log.info("The --clean flag only works on deactivated accounts.");
 				p.log.info("Your account is already live in the Atmosphere.");
 				p.log.info("");
 				p.log.info("If you need to re-import, first deactivate:");
@@ -325,7 +333,9 @@ export const migrateCommand = defineCommand({
 				"Your Bluesky Account 🦋",
 			);
 
-			p.log.info("This will copy your data - nothing is changed or deleted on Bluesky.");
+			p.log.info(
+				"This will copy your data - nothing is changed or deleted on Bluesky.",
+			);
 
 			const proceed = await p.confirm({
 				message: "Ready to start packing?",
@@ -360,7 +370,9 @@ export const migrateCommand = defineCommand({
 			process.exit(0);
 		}
 
-		spinner.start(`Logging in to ${isBlueskyPds ? "Bluesky" : sourceDomain}...`);
+		spinner.start(
+			`Logging in to ${isBlueskyPds ? "Bluesky" : sourceDomain}...`,
+		);
 		try {
 			const session = await sourceClient.createSession(did, password);
 			sourceClient.setAuthToken(session.accessJwt);
@@ -386,7 +398,9 @@ export const migrateCommand = defineCommand({
 			let carBytes: Uint8Array;
 			try {
 				carBytes = await sourceClient.getRepo(did);
-				spinner.stop(`Downloaded ${formatBytes(carBytes.length)} from ${sourceDomain}`);
+				spinner.stop(
+					`Downloaded ${formatBytes(carBytes.length)} from ${sourceDomain}`,
+				);
 			} catch (err) {
 				spinner.stop("Export failed");
 				p.log.error(
@@ -451,20 +465,29 @@ export const migrateCommand = defineCommand({
 
 				for (const blob of page.blobs) {
 					try {
-						const { bytes, mimeType } = await sourceClient.getBlob(did, blob.cid);
+						const { bytes, mimeType } = await sourceClient.getBlob(
+							did,
+							blob.cid,
+						);
 						await targetClient.uploadBlob(bytes, mimeType);
 						synced++;
-						spinner.message(`Transferring images ${progressBar(synced, totalBlobs)}`);
+						spinner.message(
+							`Transferring images ${progressBar(synced, totalBlobs)}`,
+						);
 					} catch (err) {
 						synced++;
 						failedBlobs.push(blob.cid);
-						spinner.message(`Transferring images ${progressBar(synced, totalBlobs)}`);
+						spinner.message(
+							`Transferring images ${progressBar(synced, totalBlobs)}`,
+						);
 					}
 				}
 			} while (cursor);
 
 			if (failedBlobs.length > 0) {
-				spinner.stop(`Transferred ${formatNumber(synced - failedBlobs.length)} images (${failedBlobs.length} failed)`);
+				spinner.stop(
+					`Transferred ${formatNumber(synced - failedBlobs.length)} images (${failedBlobs.length} failed)`,
+				);
 				p.log.warn(`Run 'pds migrate' again to retry failed transfers.`);
 			} else {
 				spinner.stop(`Transferred ${formatNumber(synced)} images`);

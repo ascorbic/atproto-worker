@@ -18,7 +18,7 @@ export type { OAuthClientMetadata };
 export class ClientResolutionError extends Error {
 	constructor(
 		message: string,
-		public readonly code: string
+		public readonly code: string,
 	) {
 		super(message);
 		this.name = "ClientResolutionError";
@@ -110,13 +110,17 @@ export class ClientResolver {
 		if (!isHttpsUrl(clientId) && !isValidDid(clientId)) {
 			throw new ClientResolutionError(
 				`Invalid client ID format: ${clientId}`,
-				"invalid_client"
+				"invalid_client",
 			);
 		}
 
 		if (this.storage) {
 			const cached = await this.storage.getClient(clientId);
-			if (cached && cached.cachedAt && Date.now() - cached.cachedAt < this.cacheTtl) {
+			if (
+				cached &&
+				cached.cachedAt &&
+				Date.now() - cached.cachedAt < this.cacheTtl
+			) {
 				return cached;
 			}
 		}
@@ -125,7 +129,7 @@ export class ClientResolver {
 		if (!metadataUrl) {
 			throw new ClientResolutionError(
 				`Unsupported client ID format: ${clientId}`,
-				"invalid_client"
+				"invalid_client",
 			);
 		}
 
@@ -139,14 +143,14 @@ export class ClientResolver {
 		} catch (e) {
 			throw new ClientResolutionError(
 				`Failed to fetch client metadata: ${e}`,
-				"invalid_client"
+				"invalid_client",
 			);
 		}
 
 		if (!response.ok) {
 			throw new ClientResolutionError(
 				`Client metadata fetch failed with status ${response.status}`,
-				"invalid_client"
+				"invalid_client",
 			);
 		}
 
@@ -157,14 +161,14 @@ export class ClientResolver {
 		} catch (e) {
 			throw new ClientResolutionError(
 				`Invalid client metadata: ${e instanceof Error ? e.message : "validation failed"}`,
-				"invalid_client"
+				"invalid_client",
 			);
 		}
 
 		if (doc.client_id !== clientId) {
 			throw new ClientResolutionError(
 				`Client ID mismatch: expected ${clientId}, got ${doc.client_id}`,
-				"invalid_client"
+				"invalid_client",
 			);
 		}
 
@@ -190,7 +194,10 @@ export class ClientResolver {
 	 * @param redirectUri The redirect URI to validate
 	 * @returns true if the redirect URI is allowed
 	 */
-	async validateRedirectUri(clientId: string, redirectUri: string): Promise<boolean> {
+	async validateRedirectUri(
+		clientId: string,
+		redirectUri: string,
+	): Promise<boolean> {
 		try {
 			const metadata = await this.resolveClient(clientId);
 			return metadata.redirectUris.includes(redirectUri);
@@ -203,6 +210,8 @@ export class ClientResolver {
 /**
  * Create a client resolver with optional caching
  */
-export function createClientResolver(options: ClientResolverOptions = {}): ClientResolver {
+export function createClientResolver(
+	options: ClientResolverOptions = {},
+): ClientResolver {
 	return new ClientResolver(options);
 }

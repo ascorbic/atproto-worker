@@ -90,7 +90,15 @@ export interface ConsentUIOptions {
  * @returns HTML string
  */
 export function renderConsentUI(options: ConsentUIOptions): string {
-	const { client, scope, authorizeUrl, oauthParams, userHandle, showLogin, error } = options;
+	const {
+		client,
+		scope,
+		authorizeUrl,
+		oauthParams,
+		userHandle,
+		showLogin,
+		error,
+	} = options;
 
 	const clientName = escapeHtml(client.clientName);
 	const scopeDescriptions = getScopeDescriptions(scope);
@@ -113,7 +121,10 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 
 	// Render OAuth params as hidden form fields
 	const hiddenFieldsHtml = Object.entries(oauthParams)
-		.map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}" />`)
+		.map(
+			([key, value]) =>
+				`<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}" />`,
+		)
 		.join("\n\t\t\t");
 
 	return `<!DOCTYPE html>
@@ -368,7 +379,7 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 export function renderErrorPage(
 	error: string,
 	description: string,
-	redirectUri?: string
+	redirectUri?: string,
 ): string {
 	const escapedError = escapeHtml(error);
 	const escapedDescription = escapeHtml(description);

@@ -524,23 +524,29 @@ describe("Account Migration", () => {
 		it("activates a deactivated account", async () => {
 			// First deactivate
 			const deactivateResponse = await worker.fetch(
-				new Request(`http://pds.test/xrpc/com.atproto.server.deactivateAccount`, {
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+				new Request(
+					`http://pds.test/xrpc/com.atproto.server.deactivateAccount`,
+					{
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
 					},
-				}),
+				),
 				env,
 			);
 			expect(deactivateResponse.ok).toBe(true);
 
 			// Verify deactivated
 			const statusResponse1 = await worker.fetch(
-				new Request(`http://pds.test/xrpc/com.atproto.server.getAccountStatus`, {
-					headers: {
-						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+				new Request(
+					`http://pds.test/xrpc/com.atproto.server.getAccountStatus`,
+					{
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
 					},
-				}),
+				),
 				env,
 			);
 			const status1 = (await statusResponse1.json()) as { active: boolean };
@@ -563,11 +569,14 @@ describe("Account Migration", () => {
 
 			// Verify activated
 			const statusResponse2 = await worker.fetch(
-				new Request(`http://pds.test/xrpc/com.atproto.server.getAccountStatus`, {
-					headers: {
-						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+				new Request(
+					`http://pds.test/xrpc/com.atproto.server.getAccountStatus`,
+					{
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
 					},
-				}),
+				),
 				env,
 			);
 			const status2 = (await statusResponse2.json()) as { active: boolean };
@@ -578,9 +587,12 @@ describe("Account Migration", () => {
 	describe("com.atproto.server.deactivateAccount", () => {
 		it("requires authentication", async () => {
 			const response = await worker.fetch(
-				new Request(`http://pds.test/xrpc/com.atproto.server.deactivateAccount`, {
-					method: "POST",
-				}),
+				new Request(
+					`http://pds.test/xrpc/com.atproto.server.deactivateAccount`,
+					{
+						method: "POST",
+					},
+				),
 				env,
 			);
 
@@ -613,12 +625,15 @@ describe("Account Migration", () => {
 
 			// Deactivate
 			const deactivateResponse = await worker.fetch(
-				new Request(`http://pds.test/xrpc/com.atproto.server.deactivateAccount`, {
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+				new Request(
+					`http://pds.test/xrpc/com.atproto.server.deactivateAccount`,
+					{
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
 					},
-				}),
+				),
 				env,
 			);
 
@@ -628,11 +643,14 @@ describe("Account Migration", () => {
 
 			// Verify deactivated
 			const statusResponse = await worker.fetch(
-				new Request(`http://pds.test/xrpc/com.atproto.server.getAccountStatus`, {
-					headers: {
-						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+				new Request(
+					`http://pds.test/xrpc/com.atproto.server.getAccountStatus`,
+					{
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
 					},
-				}),
+				),
 				env,
 			);
 			const status = (await statusResponse.json()) as { active: boolean };
@@ -665,7 +683,6 @@ describe("Account Migration", () => {
 			expect(error.error).toBe("AccountDeactivated");
 		});
 	});
-
 
 	describe("gg.mk.experimental.resetMigration", () => {
 		it("requires authentication", async () => {
@@ -733,12 +750,15 @@ describe("Account Migration", () => {
 
 			// Deactivate the account
 			await worker.fetch(
-				new Request(`http://pds.test/xrpc/com.atproto.server.deactivateAccount`, {
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${env.AUTH_TOKEN}`,
+				new Request(
+					`http://pds.test/xrpc/com.atproto.server.deactivateAccount`,
+					{
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${env.AUTH_TOKEN}`,
+						},
 					},
-				}),
+				),
 				env,
 			);
 

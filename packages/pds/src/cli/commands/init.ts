@@ -515,7 +515,8 @@ export const initCommand = defineCommand({
 				pc.cyan("  PDS hostname: ") + hostname,
 				pc.cyan("  DID: ") + pc.dim(did),
 				pc.cyan("  Handle: ") + pc.bold(handle),
-				pc.cyan("  Public signing key: ") + pc.dim(signingKeyPublic.slice(0, 20) + "..."),
+				pc.cyan("  Public signing key: ") +
+					pc.dim(signingKeyPublic.slice(0, 20) + "..."),
 				"",
 				isProduction
 					? pc.green("✓ Secrets deployed to Cloudflare ☁️")
@@ -553,7 +554,9 @@ export const initCommand = defineCommand({
 						? pc.bold("Deploy your worker and run the migration:")
 						: pc.bold("Push secrets, deploy, and run the migration:"),
 					"",
-					...(deployedSecrets ? [] : [pc.cyan("  pnpm pds init --production"), ""]),
+					...(deployedSecrets
+						? []
+						: [pc.cyan("  pnpm pds init --production"), ""]),
 					pc.cyan("  wrangler deploy"),
 					pc.cyan("  pnpm pds migrate"),
 					"",

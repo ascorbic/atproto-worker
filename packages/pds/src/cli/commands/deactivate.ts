@@ -89,7 +89,11 @@ export const deactivateCommand = defineCommand({
 		// Show warning
 		p.box(
 			[
-				pc.yellow(pc.bold(`⚠️  WARNING: This will disable writes for @${handle || "your-handle"}`)),
+				pc.yellow(
+					pc.bold(
+						`⚠️  WARNING: This will disable writes for @${handle || "your-handle"}`,
+					),
+				),
 				"",
 				"Your account will:",
 				"  • Stop accepting new posts, follows, and other writes",

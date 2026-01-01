@@ -1091,7 +1091,10 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	async rpcListMissingBlobs(
 		limit: number = 500,
 		cursor?: string,
-	): Promise<{ blobs: Array<{ cid: string; recordUri: string }>; cursor?: string }> {
+	): Promise<{
+		blobs: Array<{ cid: string; recordUri: string }>;
+		cursor?: string;
+	}> {
 		const storage = await this.getStorage();
 		return storage.listMissingBlobs(limit, cursor);
 	}

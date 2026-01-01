@@ -148,7 +148,7 @@ describe("OAuth Flow", () => {
 
 	describe("Token Endpoint", () => {
 		async function getAuthCode(
-			verifier: string
+			verifier: string,
 		): Promise<{ code: string; challenge: string }> {
 			const challenge = await generateCodeChallenge(verifier);
 
@@ -187,7 +187,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const body = new URLSearchParams({
@@ -231,7 +231,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const body = new URLSearchParams({
@@ -268,7 +268,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const body = new URLSearchParams({
@@ -296,7 +296,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const request2 = new Request("https://pds.example.com/oauth/token", {
@@ -322,7 +322,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const body1 = new URLSearchParams({
@@ -350,7 +350,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const body2 = new URLSearchParams({
@@ -370,7 +370,10 @@ describe("OAuth Flow", () => {
 			const response2 = await provider.handleToken(request2);
 			expect(response2.status).toBe(200);
 
-			const json2 = (await response2.json()) as { access_token: string; refresh_token: string };
+			const json2 = (await response2.json()) as {
+				access_token: string;
+				refresh_token: string;
+			};
 			expect(json2.access_token).toBeDefined();
 			expect(json2.refresh_token).toBeDefined();
 			// Refresh token should be rotated
@@ -385,10 +388,12 @@ describe("OAuth Flow", () => {
 
 			const json = (await response.json()) as Record<string, unknown>;
 			expect(json.issuer).toBe("https://pds.example.com");
-			expect(json.authorization_endpoint).toBe("https://pds.example.com/oauth/authorize");
+			expect(json.authorization_endpoint).toBe(
+				"https://pds.example.com/oauth/authorize",
+			);
 			expect(json.token_endpoint).toBe("https://pds.example.com/oauth/token");
 			expect(json.pushed_authorization_request_endpoint).toBe(
-				"https://pds.example.com/oauth/par"
+				"https://pds.example.com/oauth/par",
 			);
 			expect(json.response_types_supported).toContain("code");
 			expect(json.code_challenge_methods_supported).toContain("S256");
@@ -428,7 +433,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const tokenBody = new URLSearchParams({
@@ -454,7 +459,7 @@ describe("OAuth Flow", () => {
 			// Compute access token hash for DPoP proof
 			const tokenHash = await crypto.subtle.digest(
 				"SHA-256",
-				new TextEncoder().encode(tokens.access_token)
+				new TextEncoder().encode(tokens.access_token),
 			);
 			const ath = btoa(String.fromCharCode(...new Uint8Array(tokenHash)))
 				.replace(/\+/g, "-")
@@ -466,7 +471,7 @@ describe("OAuth Flow", () => {
 				keyPair.privateKey,
 				keyPair.publicJwk,
 				{ htm: "GET", htu: "https://pds.example.com/api/resource", ath },
-				"ES256"
+				"ES256",
 			);
 
 			const apiRequest = new Request("https://pds.example.com/api/resource", {
@@ -514,7 +519,7 @@ describe("OAuth Flow", () => {
 				keyPair1.privateKey,
 				keyPair1.publicJwk,
 				{ htm: "POST", htu: "https://pds.example.com/oauth/token" },
-				"ES256"
+				"ES256",
 			);
 
 			const tokenBody = new URLSearchParams({
@@ -542,7 +547,7 @@ describe("OAuth Flow", () => {
 
 			const tokenHash = await crypto.subtle.digest(
 				"SHA-256",
-				new TextEncoder().encode(tokens.access_token)
+				new TextEncoder().encode(tokens.access_token),
 			);
 			const ath = btoa(String.fromCharCode(...new Uint8Array(tokenHash)))
 				.replace(/\+/g, "-")
@@ -553,7 +558,7 @@ describe("OAuth Flow", () => {
 				keyPair2.privateKey,
 				keyPair2.publicJwk,
 				{ htm: "GET", htu: "https://pds.example.com/api/resource", ath },
-				"ES256"
+				"ES256",
 			);
 
 			const apiRequest = new Request("https://pds.example.com/api/resource", {

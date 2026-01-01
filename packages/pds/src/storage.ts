@@ -307,7 +307,7 @@ export class SqliteRepoStorage
 		const rows = this.sql
 			.exec("SELECT active FROM repo_state WHERE id = 1")
 			.toArray();
-		return rows.length > 0 ? ((rows[0]!.active as number) === 1) : true;
+		return rows.length > 0 ? (rows[0]!.active as number) === 1 : true;
 	}
 
 	/**

@@ -221,7 +221,9 @@ export const migrateCommand = defineCommand({
 			return;
 		}
 
-		spinner.start(`Fetching your account details from ${pc.cyan(sourceDomain)}...`);
+		spinner.start(
+			`Fetching your account details from ${pc.cyan(sourceDomain)}...`,
+		);
 
 		const sourceClient = new PDSClient(sourcePdsUrl);
 		try {
@@ -397,7 +399,9 @@ export const migrateCommand = defineCommand({
 			const preferences = await sourceClient.getPreferences();
 			if (preferences.length > 0) {
 				await targetClient.putPreferences(preferences);
-				spinner.stop(`Migrated ${preferences.length} preference${preferences.length === 1 ? "" : "s"}`);
+				spinner.stop(
+					`Migrated ${preferences.length} preference${preferences.length === 1 ? "" : "s"}`,
+				);
 			} else {
 				spinner.stop("No preferences to migrate");
 			}
@@ -425,13 +429,15 @@ export const migrateCommand = defineCommand({
 				countCursor = page.cursor;
 			} while (countCursor);
 
-			spinner.stop(`Found ${pc.yellow(formatNumber(totalBlobs))} images to transfer`);
+			spinner.stop(
+				`Found ${pc.yellow(formatNumber(totalBlobs))} images to transfer`,
+			);
 
 			// Use clack progress bar for transferring
 			const progressBar = p.progress({
 				max: totalBlobs,
-				style: 'heavy',
-				size: 30
+				style: "block",
+				size: 30,
 			});
 			progressBar.start("Transferring images");
 
@@ -447,11 +453,17 @@ export const migrateCommand = defineCommand({
 						);
 						await targetClient.uploadBlob(bytes, mimeType);
 						synced++;
-						progressBar.advance(1, `${pc.green(formatNumber(synced))}/${formatNumber(totalBlobs)} images transferred`);
+						progressBar.advance(
+							1,
+							`${pc.green(formatNumber(synced))}/${formatNumber(totalBlobs)} images transferred`,
+						);
 					} catch (err) {
 						synced++;
 						failedBlobs.push(blob.cid);
-						progressBar.advance(1, `${synced}/${totalBlobs} images (${failedBlobs.length} failed)`);
+						progressBar.advance(
+							1,
+							`${synced}/${totalBlobs} images (${failedBlobs.length} failed)`,
+						);
 					}
 				}
 			} while (cursor);

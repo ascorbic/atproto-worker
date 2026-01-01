@@ -5,7 +5,10 @@
 /**
  * Get target PDS URL based on mode
  */
-export function getTargetUrl(isDev: boolean, pdsHostname: string | undefined): string {
+export function getTargetUrl(
+	isDev: boolean,
+	pdsHostname: string | undefined,
+): string {
 	const LOCAL_PDS_URL = "http://localhost:5173";
 
 	if (isDev) {

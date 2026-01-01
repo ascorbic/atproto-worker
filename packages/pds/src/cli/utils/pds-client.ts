@@ -199,7 +199,8 @@ export class PDSClient {
 		}
 
 		const bytes = new Uint8Array(await res.arrayBuffer());
-		const mimeType = res.headers.get("content-type") ?? "application/octet-stream";
+		const mimeType =
+			res.headers.get("content-type") ?? "application/octet-stream";
 
 		return { bytes, mimeType };
 	}
@@ -262,11 +263,9 @@ export class PDSClient {
 	 * Export repository as CAR file
 	 */
 	async getRepo(did: string): Promise<Uint8Array> {
-		const { bytes } = await this.xrpcBytes(
-			"GET",
-			"com.atproto.sync.getRepo",
-			{ params: { did } },
-		);
+		const { bytes } = await this.xrpcBytes("GET", "com.atproto.sync.getRepo", {
+			params: { did },
+		});
 		return bytes;
 	}
 
@@ -417,7 +416,9 @@ export class PDSClient {
 	 */
 	async healthCheck(): Promise<boolean> {
 		try {
-			const res = await fetch(new URL("/xrpc/_health", this.baseUrl).toString());
+			const res = await fetch(
+				new URL("/xrpc/_health", this.baseUrl).toString(),
+			);
 			return res.ok;
 		} catch {
 			return false;

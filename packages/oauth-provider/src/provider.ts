@@ -4,7 +4,12 @@
  */
 
 import type { OAuthAuthorizationServerMetadata } from "@atproto/oauth-types";
-import type { OAuthStorage, AuthCodeData, TokenData, ClientMetadata } from "./storage.js";
+import type {
+	OAuthStorage,
+	AuthCodeData,
+	TokenData,
+	ClientMetadata,
+} from "./storage.js";
 import { verifyPkceChallenge } from "./pkce.js";
 import { verifyDpopProof, DpopError, generateDpopNonce } from "./dpop.js";
 import { PARHandler } from "./par.js";
@@ -35,7 +40,9 @@ export interface OAuthProviderConfig {
 	/** Client resolver for DID-based discovery */
 	clientResolver?: ClientResolver;
 	/** Callback to verify user credentials */
-	verifyUser?: (password: string) => Promise<{ sub: string; handle: string } | null>;
+	verifyUser?: (
+		password: string,
+	) => Promise<{ sub: string; handle: string } | null>;
 	/** Get the current user (if already authenticated) */
 	getCurrentUser?: () => Promise<{ sub: string; handle: string } | null>;
 }
@@ -43,7 +50,11 @@ export interface OAuthProviderConfig {
 /**
  * OAuth error response builder
  */
-function oauthError(error: string, description: string, status: number = 400): Response {
+function oauthError(
+	error: string,
+	description: string,
+	status: number = 400,
+): Response {
 	return new Response(
 		JSON.stringify({
 			error,
@@ -55,7 +66,7 @@ function oauthError(error: string, description: string, status: number = 400): R
 				"Content-Type": "application/json",
 				"Cache-Control": "no-store",
 			},
-		}
+		},
 	);
 }
 
@@ -73,21 +84,26 @@ export class RequestBodyError extends Error {
  * Parse request body from JSON or form-urlencoded
  * @throws RequestBodyError if content type is unsupported or parsing fails
  */
-export async function parseRequestBody(request: Request): Promise<Record<string, string>> {
+export async function parseRequestBody(
+	request: Request,
+): Promise<Record<string, string>> {
 	const contentType = request.headers.get("Content-Type") ?? "";
 
 	try {
 		if (contentType.includes("application/json")) {
 			const json = await request.json();
 			return Object.fromEntries(
-				Object.entries(json as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+				Object.entries(json as Record<string, unknown>).map(([k, v]) => [
+					k,
+					String(v),
+				]),
 			);
 		} else if (contentType.includes("application/x-www-form-urlencoded")) {
 			const body = await request.text();
 			return Object.fromEntries(new URLSearchParams(body).entries());
 		} else {
 			throw new RequestBodyError(
-				"Content-Type must be application/json or application/x-www-form-urlencoded"
+				"Content-Type must be application/json or application/x-www-form-urlencoded",
 			);
 		}
 	} catch (e) {
@@ -108,8 +124,13 @@ export class ATProtoOAuthProvider {
 	private enablePAR: boolean;
 	private parHandler: PARHandler;
 	private clientResolver: ClientResolver;
-	private verifyUser?: (password: string) => Promise<{ sub: string; handle: string } | null>;
-	private getCurrentUser?: () => Promise<{ sub: string; handle: string } | null>;
+	private verifyUser?: (
+		password: string,
+	) => Promise<{ sub: string; handle: string } | null>;
+	private getCurrentUser?: () => Promise<{
+		sub: string;
+		handle: string;
+	} | null>;
 
 	constructor(config: OAuthProviderConfig) {
 		this.storage = config.storage;
@@ -117,7 +138,8 @@ export class ATProtoOAuthProvider {
 		this.dpopRequired = config.dpopRequired ?? true;
 		this.enablePAR = config.enablePAR ?? true;
 		this.parHandler = new PARHandler(config.storage, config.issuer);
-		this.clientResolver = config.clientResolver ?? new ClientResolver({ storage: config.storage });
+		this.clientResolver =
+			config.clientResolver ?? new ClientResolver({ storage: config.storage });
 		this.verifyUser = config.verifyUser;
 		this.getCurrentUser = config.getCurrentUser;
 	}
@@ -147,11 +169,20 @@ export class ATProtoOAuthProvider {
 
 			if (requestUri && this.enablePAR) {
 				if (!clientId) {
-					return this.renderError("invalid_request", "client_id required with request_uri");
+					return this.renderError(
+						"invalid_request",
+						"client_id required with request_uri",
+					);
 				}
-				const parParams = await this.parHandler.retrieveParams(requestUri, clientId);
+				const parParams = await this.parHandler.retrieveParams(
+					requestUri,
+					clientId,
+				);
 				if (!parParams) {
-					return this.renderError("invalid_request", "Invalid or expired request_uri");
+					return this.renderError(
+						"invalid_request",
+						"Invalid or expired request_uri",
+					);
 				}
 				params = parParams;
 			} else {
@@ -161,21 +192,39 @@ export class ATProtoOAuthProvider {
 		}
 
 		// Validate required parameters
-		const required = ["client_id", "redirect_uri", "response_type", "code_challenge", "state"];
+		const required = [
+			"client_id",
+			"redirect_uri",
+			"response_type",
+			"code_challenge",
+			"state",
+		];
 		for (const param of required) {
 			if (!params[param]) {
-				return this.renderError("invalid_request", `Missing required parameter: ${param}`);
+				return this.renderError(
+					"invalid_request",
+					`Missing required parameter: ${param}`,
+				);
 			}
 		}
 
 		// Validate response_type
 		if (params.response_type !== "code") {
-			return this.renderError("unsupported_response_type", "Only response_type=code is supported");
+			return this.renderError(
+				"unsupported_response_type",
+				"Only response_type=code is supported",
+			);
 		}
 
 		// Validate code_challenge_method
-		if (params.code_challenge_method && params.code_challenge_method !== "S256") {
-			return this.renderError("invalid_request", "Only code_challenge_method=S256 is supported");
+		if (
+			params.code_challenge_method &&
+			params.code_challenge_method !== "S256"
+		) {
+			return this.renderError(
+				"invalid_request",
+				"Only code_challenge_method=S256 is supported",
+			);
 		}
 
 		// Resolve client metadata
@@ -183,12 +232,18 @@ export class ATProtoOAuthProvider {
 		try {
 			client = await this.clientResolver.resolveClient(params.client_id!);
 		} catch (e) {
-			return this.renderError("invalid_client", `Failed to resolve client: ${e}`);
+			return this.renderError(
+				"invalid_client",
+				`Failed to resolve client: ${e}`,
+			);
 		}
 
 		// Validate redirect_uri
 		if (!client.redirectUris.includes(params.redirect_uri!)) {
-			return this.renderError("invalid_request", "Invalid redirect_uri for this client");
+			return this.renderError(
+				"invalid_request",
+				"Invalid redirect_uri for this client",
+			);
 		}
 
 		// Handle POST (form submission)
@@ -230,7 +285,7 @@ export class ATProtoOAuthProvider {
 	private async handleAuthorizePost(
 		request: Request,
 		params: Record<string, string>,
-		client: ClientMetadata
+		client: ClientMetadata,
 	): Promise<Response> {
 		// Form data was already parsed in handleAuthorize - extract action and password
 		const action = params.action;
@@ -253,7 +308,10 @@ export class ATProtoOAuthProvider {
 				errorUrl.hash = hashParams.toString();
 			} else {
 				errorUrl.searchParams.set("error", "access_denied");
-				errorUrl.searchParams.set("error_description", "User denied authorization");
+				errorUrl.searchParams.set(
+					"error_description",
+					"User denied authorization",
+				);
 				errorUrl.searchParams.set("state", state);
 				errorUrl.searchParams.set("iss", this.issuer);
 			}
@@ -339,7 +397,10 @@ export class ATProtoOAuthProvider {
 		try {
 			params = await parseRequestBody(request);
 		} catch (e) {
-			return oauthError("invalid_request", e instanceof Error ? e.message : "Invalid request");
+			return oauthError(
+				"invalid_request",
+				e instanceof Error ? e.message : "Invalid request",
+			);
 		}
 
 		const grantType = params.grant_type;
@@ -349,7 +410,10 @@ export class ATProtoOAuthProvider {
 		} else if (grantType === "refresh_token") {
 			return this.handleRefreshTokenGrant(request, params);
 		} else {
-			return oauthError("unsupported_grant_type", `Unsupported grant_type: ${grantType}`);
+			return oauthError(
+				"unsupported_grant_type",
+				`Unsupported grant_type: ${grantType}`,
+			);
 		}
 	}
 
@@ -358,20 +422,26 @@ export class ATProtoOAuthProvider {
 	 */
 	private async handleAuthorizationCodeGrant(
 		request: Request,
-		params: Record<string, string>
+		params: Record<string, string>,
 	): Promise<Response> {
 		// Validate required parameters
 		const required = ["code", "client_id", "redirect_uri", "code_verifier"];
 		for (const param of required) {
 			if (!params[param]) {
-				return oauthError("invalid_request", `Missing required parameter: ${param}`);
+				return oauthError(
+					"invalid_request",
+					`Missing required parameter: ${param}`,
+				);
 			}
 		}
 
 		// Get authorization code data
 		const codeData = await this.storage.getAuthCode(params.code!);
 		if (!codeData) {
-			return oauthError("invalid_grant", "Invalid or expired authorization code");
+			return oauthError(
+				"invalid_grant",
+				"Invalid or expired authorization code",
+			);
 		}
 
 		// Delete code (one-time use)
@@ -391,7 +461,7 @@ export class ATProtoOAuthProvider {
 		const pkceValid = await verifyPkceChallenge(
 			params.code_verifier!,
 			codeData.codeChallenge,
-			codeData.codeChallengeMethod
+			codeData.codeChallengeMethod,
 		);
 		if (!pkceValid) {
 			return oauthError("invalid_grant", "Invalid code_verifier");
@@ -427,7 +497,7 @@ export class ATProtoOAuthProvider {
 									"DPoP-Nonce": nonce,
 									"Cache-Control": "no-store",
 								},
-							}
+							},
 						);
 					}
 					return oauthError("invalid_dpop_proof", e.message);
@@ -440,9 +510,14 @@ export class ATProtoOAuthProvider {
 			if (dpopHeader) {
 				try {
 					const dpopProof = await verifyDpopProof(request);
-					const nonceUnique = await this.storage.checkAndSaveNonce(dpopProof.jti);
+					const nonceUnique = await this.storage.checkAndSaveNonce(
+						dpopProof.jti,
+					);
 					if (!nonceUnique) {
-						return oauthError("invalid_dpop_proof", "DPoP proof replay detected");
+						return oauthError(
+							"invalid_dpop_proof",
+							"DPoP proof replay detected",
+						);
 					}
 					dpopJkt = dpopProof.jkt;
 				} catch (e) {
@@ -480,7 +555,7 @@ export class ATProtoOAuthProvider {
 	 */
 	private async handleRefreshTokenGrant(
 		request: Request,
-		params: Record<string, string>
+		params: Record<string, string>,
 	): Promise<Response> {
 		const refreshToken = params.refresh_token;
 		if (!refreshToken) {
@@ -569,7 +644,11 @@ export class ATProtoOAuthProvider {
 			grant_types_supported: ["authorization_code", "refresh_token"],
 			code_challenge_methods_supported: ["S256"],
 			token_endpoint_auth_methods_supported: ["none"],
-			scopes_supported: ["atproto", "transition:generic", "transition:chat.bsky"],
+			scopes_supported: [
+				"atproto",
+				"transition:generic",
+				"transition:chat.bsky",
+			],
 			subject_types_supported: ["public"],
 			authorization_response_iss_parameter_supported: true,
 			client_id_metadata_document_supported: true,
@@ -600,7 +679,7 @@ export class ATProtoOAuthProvider {
 	 */
 	async verifyAccessToken(
 		request: Request,
-		requiredScope?: string
+		requiredScope?: string,
 	): Promise<TokenData | null> {
 		// Extract token from Authorization header
 		const tokenInfo = extractAccessToken(request);

@@ -89,7 +89,7 @@ export const activateCommand = defineCommand({
 		// Show confirmation
 		p.box(
 			[
-				pc.bold(`@${handle || "your-handle"}`),  
+				pc.bold(`@${handle || "your-handle"}`),
 				"",
 				"This will enable writes and make your account live.",
 				"Make sure you've:",

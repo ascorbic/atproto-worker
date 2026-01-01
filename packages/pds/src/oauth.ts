@@ -208,7 +208,10 @@ export function createOAuthApp(
 			}
 		} catch {
 			return c.json(
-				{ error: "invalid_request", error_description: "Failed to parse request body" },
+				{
+					error: "invalid_request",
+					error_description: "Failed to parse request body",
+				},
 				400,
 			);
 		}

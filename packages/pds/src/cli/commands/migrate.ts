@@ -428,7 +428,11 @@ export const migrateCommand = defineCommand({
 			spinner.stop(`Found ${formatNumber(totalBlobs)} images to transfer`);
 
 			// Use clack progress bar for transferring
-			const progressBar = p.progress({ max: totalBlobs });
+			const progressBar = p.progress({
+				max: totalBlobs,
+				style: 'block',
+				size: 30
+			});
 			progressBar.start("Transferring images");
 
 			do {

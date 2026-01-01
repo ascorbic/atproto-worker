@@ -26,6 +26,8 @@ export interface PDSEnv {
 	ACCOUNT: DurableObjectNamespace<AccountDurableObject>;
 	/** R2 bucket for blob storage (optional) */
 	BLOBS?: R2Bucket;
+	/** Initial activation state for new accounts (default: true) */
+	INITIAL_ACTIVE?: string;
 }
 
 /**

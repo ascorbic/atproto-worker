@@ -106,7 +106,7 @@ const main = defineCommand({
 	args: {
 		name: {
 			type: "positional",
-			description: "Project name",
+			description: "Folder name",
 			required: false,
 		},
 		"package-manager": {
@@ -138,32 +138,33 @@ const main = defineCommand({
 	},
 	async run({ args }) {
 		const nonInteractive = args.yes || !process.stdout.isTTY;
-		p.intro("Create PDS");
+		p.intro("🦋 Create PDS");
 
+		p.log.info("Let's build your new home in the Atmosphere!");
 		p.log.warn(
-			"This is experimental software. Do not migrate your main Bluesky account yet.",
+			"This is experimental software. Don't migrate your main account yet.",
 		);
 
 		if (!nonInteractive) {
-			p.note("Use --yes to run non-interactively", "Tip");
+			p.log.message("Tip: Use --yes to skip prompts");
 		}
 
-		// Get project name
+		// Get folder name
 		let projectName = args.name;
 		if (!projectName) {
 			if (nonInteractive) {
-				projectName = "pds-worker";
+				projectName = "my-pds";
 			} else {
 				const result = await p.text({
-					message: "Project name:",
-					placeholder: "pds-worker",
-					defaultValue: "pds-worker",
+					message: "Folder name:",
+					placeholder: "my-pds",
+					defaultValue: "my-pds",
 				});
 				if (p.isCancel(result)) {
 					p.cancel("Cancelled");
 					process.exit(0);
 				}
-				projectName = result || "pds-worker";
+				projectName = result || "my-pds";
 			}
 		}
 
@@ -273,7 +274,7 @@ const main = defineCommand({
 
 		// Run pds init
 		if (!args["skip-init"] && !args["skip-install"]) {
-			p.log.info("Now let's configure your PDS for local development");
+			p.log.info("Now let's set up your account...");
 
 			try {
 				const pdsArgs = ["run", "pds", "init"];
@@ -305,10 +306,10 @@ const main = defineCommand({
 				"",
 				"Your PDS will be running at http://localhost:5173",
 			].join("\n"),
-			"Next steps",
+			"Next Steps",
 		);
 
-		p.outro("Happy building!");
+		p.outro("Welcome to the Atmosphere! 🦋");
 	},
 });
 

@@ -224,37 +224,49 @@ export async function deleteSession(c: Context<AppEnv>): Promise<Response> {
 }
 
 /**
- * Get account status - used for migration checks
+ * Get account status - used for migration checks and progress tracking
  */
 export async function getAccountStatus(
 	c: Context<AuthedAppEnv>,
 	accountDO: DurableObjectStub<AccountDurableObject>,
 ): Promise<Response> {
 	try {
-		// Check if repo exists
+		// Check if repo exists and get activation state
 		const status = await accountDO.rpcGetRepoStatus();
+		const active = await accountDO.rpcGetActive();
+
+		// Get counts for migration progress tracking
+		const [repoBlocks, indexedRecords, expectedBlobs, importedBlobs] =
+			await Promise.all([
+				accountDO.rpcCountBlocks(),
+				accountDO.rpcCountRecords(),
+				accountDO.rpcCountExpectedBlobs(),
+				accountDO.rpcCountImportedBlobs(),
+			]);
 
 		return c.json({
-			activated: true,
+			active: active,
 			validDid: true,
+			repoCommit: status.head,
 			repoRev: status.rev,
-			repoBlocks: null, // Could implement block counting if needed
-			indexedRecords: null, // Could implement record counting if needed
+			repoBlocks,
+			indexedRecords,
 			privateStateValues: null,
-			expectedBlobs: null,
-			importedBlobs: null,
+			expectedBlobs,
+			importedBlobs,
 		});
 	} catch (err) {
 		// If repo doesn't exist yet, return empty status
 		return c.json({
-			activated: false,
+			active: false,
 			validDid: true,
+			repoCommit: null,
 			repoRev: null,
-			repoBlocks: null,
-			indexedRecords: null,
+			repoBlocks: 0,
+			indexedRecords: 0,
 			privateStateValues: null,
-			expectedBlobs: null,
-			importedBlobs: null,
+			expectedBlobs: 0,
+			importedBlobs: 0,
 		});
 	}
 }
@@ -289,4 +301,82 @@ export async function getServiceAuth(
 	});
 
 	return c.json({ token });
+}
+
+/**
+ * Activate account - enables writes and firehose events
+ */
+export async function activateAccount(
+	c: Context<AuthedAppEnv>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	try {
+		await accountDO.rpcActivateAccount();
+		return c.json({ success: true });
+	} catch (err) {
+		return c.json(
+			{
+				error: "InternalServerError",
+				message: err instanceof Error ? err.message : "Unknown error",
+			},
+			500,
+		);
+	}
+}
+
+/**
+ * Deactivate account - disables writes while keeping reads available
+ */
+export async function deactivateAccount(
+	c: Context<AuthedAppEnv>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	try {
+		await accountDO.rpcDeactivateAccount();
+		return c.json({ success: true });
+	} catch (err) {
+		return c.json(
+			{
+				error: "InternalServerError",
+				message: err instanceof Error ? err.message : "Unknown error",
+			},
+			500,
+		);
+	}
+}
+
+/**
+ * Reset migration state - clears imported repo and blob tracking.
+ * Only works on deactivated accounts.
+ */
+export async function resetMigration(
+	c: Context<AuthedAppEnv>,
+	accountDO: DurableObjectStub<AccountDurableObject>,
+): Promise<Response> {
+	try {
+		const result = await accountDO.rpcResetMigration();
+		return c.json(result);
+	} catch (err) {
+		const message = err instanceof Error ? err.message : "Unknown error";
+
+		// Check for specific error types
+		if (message.includes("AccountActive")) {
+			return c.json(
+				{
+					error: "AccountActive",
+					message:
+						"Cannot reset migration on an active account. Deactivate first.",
+				},
+				400,
+			);
+		}
+
+		return c.json(
+			{
+				error: "InternalServerError",
+				message,
+			},
+			500,
+		);
+	}
 }

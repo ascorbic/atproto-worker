@@ -12,7 +12,7 @@ import {
 } from "@atproto/repo";
 import type { RepoRecord } from "@atproto/lexicon";
 import { Secp256k1Keypair } from "@atproto/crypto";
-import { CID } from "@atproto/lex-data";
+import { CID, isCid, asCid, isBlobRef } from "@atproto/lex-data";
 import { TID } from "@atproto/common-web";
 import { AtUri } from "@atproto/syntax";
 import { encode as cborEncode } from "@atproto/lex-cbor";
@@ -66,8 +66,14 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			await this.ctx.blockConcurrencyWhile(async () => {
 				if (this.storageInitialized) return; // Double-check after acquiring lock
 
+				// Determine initial active state from env var (default true for new accounts)
+				const initialActive =
+					this.env.INITIAL_ACTIVE === undefined ||
+					this.env.INITIAL_ACTIVE === "true" ||
+					this.env.INITIAL_ACTIVE === "1";
+
 				this.storage = new SqliteRepoStorage(this.ctx.storage.sql);
-				this.storage.initSchema();
+				this.storage.initSchema(initialActive);
 				this.oauthStorage = new SqliteOAuthStorage(this.ctx.storage.sql);
 				this.oauthStorage.initSchema();
 				this.sequencer = new Sequencer(this.ctx.storage.sql);
@@ -131,6 +137,19 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	}
 
 	/**
+	 * Ensure the account is active. Throws error if deactivated.
+	 */
+	async ensureActive(): Promise<void> {
+		const storage = await this.getStorage();
+		const isActive = await storage.getActive();
+		if (!isActive) {
+			throw new Error(
+				"AccountDeactivated: Account is deactivated. Call activateAccount to enable writes.",
+			);
+		}
+	}
+
+	/**
 	 * Get the signing keypair for repository operations.
 	 */
 	async getKeypair(): Promise<Secp256k1Keypair> {
@@ -190,10 +209,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			return null;
 		}
 
-		const record = (await repo.getRecord(
-			collection,
-			rkey,
-		)) as Rpc.Serializable<any>;
+		const record = await repo.getRecord(collection, rkey);
 
 		if (!record) {
 			return null;
@@ -201,7 +217,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 
 		return {
 			cid: recordCid.toString(),
-			record,
+			record: serializeRecord(record) as Rpc.Serializable<any>,
 		};
 	}
 
@@ -232,7 +248,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			records.push({
 				uri: AtUri.make(repo.did, record.collection, record.rkey).toString(),
 				cid: record.cid.toString(),
-				value: record.record,
+				value: serializeRecord(record.record),
 			});
 
 			if (records.length >= opts.limit + 1) break;
@@ -263,6 +279,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		cid: string;
 		commit: { cid: string; rev: string };
 	}> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -336,6 +353,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		collection: string,
 		rkey: string,
 	): Promise<{ commit: { cid: string; rev: string } } | null> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -403,6 +421,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		commit: { cid: string; rev: string };
 		validationStatus: string;
 	}> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -497,6 +516,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			validationStatus?: string;
 		}>;
 	}> {
+		await this.ensureActive();
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
@@ -690,6 +710,32 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	}
 
 	/**
+	 * RPC method: Get specific blocks by CID as CAR file
+	 * Used for partial sync and migration.
+	 */
+	async rpcGetBlocks(cids: string[]): Promise<Uint8Array> {
+		const storage = await this.getStorage();
+		const root = await storage.getRoot();
+
+		if (!root) {
+			throw new Error("No repository root found");
+		}
+
+		// Get requested blocks
+		const blocks = new BlockMap();
+		for (const cidStr of cids) {
+			const cid = CID.parse(cidStr);
+			const bytes = await storage.getBytes(cid);
+			if (bytes) {
+				blocks.set(cid, bytes);
+			}
+		}
+
+		// Return CAR file with requested blocks
+		return blocksToCarFile(root, blocks);
+	}
+
+	/**
 	 * RPC method: Import repo from CAR file
 	 * This is used for account migration - importing an existing repository
 	 * from another PDS.
@@ -701,12 +747,22 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	}> {
 		await this.ensureStorageInitialized();
 
-		// Check if repo already exists
+		// Check if account is active - only allow imports on deactivated accounts
+		const isActive = await this.storage!.getActive();
 		const existingRoot = await this.storage!.getRoot();
-		if (existingRoot) {
+
+		if (isActive && existingRoot) {
+			// Account is active - reject import to prevent accidental overwrites
 			throw new Error(
 				"Repository already exists. Cannot import over existing repository.",
 			);
+		}
+
+		// If deactivated and repo exists, clear it first
+		if (existingRoot) {
+			await this.storage!.destroy();
+			this.repo = null;
+			this.repoInitialized = false;
 		}
 
 		// Use official @atproto/repo utilities to read and validate CAR
@@ -721,6 +777,9 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		this.keypair = await Secp256k1Keypair.import(this.env.SIGNING_KEY);
 		this.repo = await Repo.load(this.storage!, rootCid);
 
+		// Persist the root CID in storage so getRoot() works correctly
+		await this.storage!.updateRoot(rootCid, this.repo.commit.rev);
+
 		// Verify the DID matches to prevent incorrect migrations
 		if (this.repo.did !== this.env.DID) {
 			// Clean up imported blocks
@@ -731,6 +790,19 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		}
 
 		this.repoInitialized = true;
+
+		// Extract blob references from all imported records for tracking
+		for await (const record of this.repo.walkRecords()) {
+			const blobCids = extractBlobCids(record.record);
+			if (blobCids.length > 0) {
+				const uri = AtUri.make(
+					this.repo.did,
+					record.collection,
+					record.rkey,
+				).toString();
+				this.storage!.addRecordBlobs(uri, blobCids);
+			}
+		}
 
 		return {
 			did: this.repo.did,
@@ -755,7 +827,13 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			);
 		}
 
-		return this.blobStore.putBlob(bytes, mimeType);
+		const blobRef = await this.blobStore.putBlob(bytes, mimeType);
+
+		// Track the imported blob for migration progress
+		const storage = await this.getStorage();
+		storage.trackImportedBlob(blobRef.ref.$link, bytes.length, mimeType);
+
+		return blobRef;
 	}
 
 	/**
@@ -944,6 +1022,117 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 	}
 
 	/**
+	 * RPC method: Get account activation state
+	 */
+	async rpcGetActive(): Promise<boolean> {
+		const storage = await this.getStorage();
+		return storage.getActive();
+	}
+
+	/**
+	 * RPC method: Activate account
+	 */
+	async rpcActivateAccount(): Promise<void> {
+		const storage = await this.getStorage();
+		await storage.setActive(true);
+	}
+
+	/**
+	 * RPC method: Deactivate account
+	 */
+	async rpcDeactivateAccount(): Promise<void> {
+		const storage = await this.getStorage();
+		await storage.setActive(false);
+	}
+
+	// ============================================
+	// Migration Progress RPC Methods
+	// ============================================
+
+	/**
+	 * RPC method: Count blocks in storage
+	 */
+	async rpcCountBlocks(): Promise<number> {
+		const storage = await this.getStorage();
+		return storage.countBlocks();
+	}
+
+	/**
+	 * RPC method: Count records in repository
+	 */
+	async rpcCountRecords(): Promise<number> {
+		const repo = await this.getRepo();
+		let count = 0;
+		for await (const _record of repo.walkRecords()) {
+			count++;
+		}
+		return count;
+	}
+
+	/**
+	 * RPC method: Count expected blobs (referenced in records)
+	 */
+	async rpcCountExpectedBlobs(): Promise<number> {
+		const storage = await this.getStorage();
+		return storage.countExpectedBlobs();
+	}
+
+	/**
+	 * RPC method: Count imported blobs
+	 */
+	async rpcCountImportedBlobs(): Promise<number> {
+		const storage = await this.getStorage();
+		return storage.countImportedBlobs();
+	}
+
+	/**
+	 * RPC method: List missing blobs (referenced but not imported)
+	 */
+	async rpcListMissingBlobs(
+		limit: number = 500,
+		cursor?: string,
+	): Promise<{ blobs: Array<{ cid: string; recordUri: string }>; cursor?: string }> {
+		const storage = await this.getStorage();
+		return storage.listMissingBlobs(limit, cursor);
+	}
+
+	/**
+	 * RPC method: Reset migration state.
+	 * Clears imported repo and blob tracking to allow re-import.
+	 * Only works when account is deactivated.
+	 */
+	async rpcResetMigration(): Promise<{
+		blocksDeleted: number;
+		blobsCleared: number;
+	}> {
+		const storage = await this.getStorage();
+
+		// Only allow reset on deactivated accounts
+		const isActive = await storage.getActive();
+		if (isActive) {
+			throw new Error(
+				"AccountActive: Cannot reset migration on an active account. Deactivate first.",
+			);
+		}
+
+		// Get counts before deletion for reporting
+		const blocksDeleted = await storage.countBlocks();
+		const blobsCleared = storage.countImportedBlobs();
+
+		// Clear all blocks and reset repo state
+		await storage.destroy();
+
+		// Clear blob tracking tables
+		storage.clearBlobTracking();
+
+		// Reset in-memory repo reference so it gets reinitialized on next access
+		this.repo = null;
+		this.repoInitialized = false;
+
+		return { blocksDeleted, blobsCleared };
+	}
+
+	/**
 	 * Emit an identity event to notify downstream services to refresh identity cache.
 	 */
 	async rpcEmitIdentityEvent(handle: string): Promise<{ seq: number }> {
@@ -1117,4 +1306,64 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		// All other requests should use RPC methods, not fetch
 		return new Response("Method not allowed", { status: 405 });
 	}
+}
+
+/**
+ * Serialize a record for JSON by converting CID objects to { $link: "..." } format.
+ * CBOR-decoded records contain raw CID objects that need conversion for JSON serialization.
+ */
+function serializeRecord(obj: unknown): unknown {
+	if (obj === null || obj === undefined) return obj;
+
+	// Check if this is a CID object using @atproto/lex-data helper
+	const cid = asCid(obj);
+	if (cid) {
+		return { $link: cid.toString() };
+	}
+
+	if (Array.isArray(obj)) {
+		return obj.map(serializeRecord);
+	}
+
+	if (typeof obj === "object") {
+		const result: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(obj)) {
+			result[key] = serializeRecord(value);
+		}
+		return result;
+	}
+
+	return obj;
+}
+
+/**
+ * Extract blob CIDs from a record by recursively searching for blob references.
+ * Blob refs have the structure: { $type: "blob", ref: CID, mimeType, size }
+ */
+function extractBlobCids(obj: unknown): string[] {
+	const cids: string[] = [];
+
+	function walk(value: unknown): void {
+		if (value === null || value === undefined) return;
+
+		// Check if this is a blob reference using @atproto/lex-data helper
+		if (isBlobRef(value)) {
+			cids.push(value.ref.toString());
+			return; // No need to recurse into blob ref properties
+		}
+
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				walk(item);
+			}
+		} else if (typeof value === "object") {
+			// Recursively walk all properties
+			for (const key of Object.keys(value as Record<string, unknown>)) {
+				walk((value as Record<string, unknown>)[key]);
+			}
+		}
+	}
+
+	walk(obj);
+	return cids;
 }

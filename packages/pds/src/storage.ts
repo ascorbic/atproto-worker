@@ -18,8 +18,9 @@ export class SqliteRepoStorage
 
 	/**
 	 * Initialize the database schema. Should be called once on DO startup.
+	 * @param initialActive - Whether the account should start in active state (default true)
 	 */
-	initSchema(): void {
+	initSchema(initialActive: boolean = true): void {
 		this.sql.exec(`
 			-- Block storage (MST nodes + record blocks)
 			CREATE TABLE IF NOT EXISTS blocks (
@@ -35,12 +36,13 @@ export class SqliteRepoStorage
 				id INTEGER PRIMARY KEY CHECK (id = 1),
 				root_cid TEXT,
 				rev TEXT,
-				seq INTEGER NOT NULL DEFAULT 0
+				seq INTEGER NOT NULL DEFAULT 0,
+				active INTEGER NOT NULL DEFAULT 1
 			);
 
 			-- Initialize with empty state if not exists
-			INSERT OR IGNORE INTO repo_state (id, root_cid, rev, seq)
-			VALUES (1, NULL, NULL, 0);
+			INSERT OR IGNORE INTO repo_state (id, root_cid, rev, seq, active)
+			VALUES (1, NULL, NULL, 0, ${initialActive ? 1 : 0});
 
 			-- Firehose events (sequenced commit log)
 			CREATE TABLE IF NOT EXISTS firehose_events (
@@ -60,6 +62,23 @@ export class SqliteRepoStorage
 
 			-- Initialize with empty preferences array if not exists
 			INSERT OR IGNORE INTO preferences (id, data) VALUES (1, '[]');
+
+			-- Track blob references in records (populated during importRepo)
+			CREATE TABLE IF NOT EXISTS record_blob (
+				recordUri TEXT NOT NULL,
+				blobCid TEXT NOT NULL,
+				PRIMARY KEY (recordUri, blobCid)
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_record_blob_cid ON record_blob(blobCid);
+
+			-- Track successfully imported blobs (populated during uploadBlob)
+			CREATE TABLE IF NOT EXISTS imported_blobs (
+				cid TEXT PRIMARY KEY,
+				size INTEGER NOT NULL,
+				mimeType TEXT,
+				createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+			);
 		`);
 	}
 
@@ -279,5 +298,145 @@ export class SqliteRepoStorage
 	async putPreferences(preferences: unknown[]): Promise<void> {
 		const data = JSON.stringify(preferences);
 		this.sql.exec("UPDATE preferences SET data = ? WHERE id = 1", data);
+	}
+
+	/**
+	 * Get the activation state of the account.
+	 */
+	async getActive(): Promise<boolean> {
+		const rows = this.sql
+			.exec("SELECT active FROM repo_state WHERE id = 1")
+			.toArray();
+		return rows.length > 0 ? ((rows[0]!.active as number) === 1) : true;
+	}
+
+	/**
+	 * Set the activation state of the account.
+	 */
+	async setActive(active: boolean): Promise<void> {
+		this.sql.exec(
+			"UPDATE repo_state SET active = ? WHERE id = 1",
+			active ? 1 : 0,
+		);
+	}
+
+	// ============================================
+	// Blob Tracking Methods
+	// ============================================
+
+	/**
+	 * Add a blob reference from a record.
+	 */
+	addRecordBlob(recordUri: string, blobCid: string): void {
+		this.sql.exec(
+			"INSERT OR IGNORE INTO record_blob (recordUri, blobCid) VALUES (?, ?)",
+			recordUri,
+			blobCid,
+		);
+	}
+
+	/**
+	 * Add multiple blob references from a record.
+	 */
+	addRecordBlobs(recordUri: string, blobCids: string[]): void {
+		for (const cid of blobCids) {
+			this.addRecordBlob(recordUri, cid);
+		}
+	}
+
+	/**
+	 * Remove all blob references for a record.
+	 */
+	removeRecordBlobs(recordUri: string): void {
+		this.sql.exec("DELETE FROM record_blob WHERE recordUri = ?", recordUri);
+	}
+
+	/**
+	 * Track an imported blob.
+	 */
+	trackImportedBlob(cid: string, size: number, mimeType: string): void {
+		this.sql.exec(
+			"INSERT OR REPLACE INTO imported_blobs (cid, size, mimeType) VALUES (?, ?, ?)",
+			cid,
+			size,
+			mimeType,
+		);
+	}
+
+	/**
+	 * Check if a blob has been imported.
+	 */
+	isBlobImported(cid: string): boolean {
+		const rows = this.sql
+			.exec("SELECT 1 FROM imported_blobs WHERE cid = ? LIMIT 1", cid)
+			.toArray();
+		return rows.length > 0;
+	}
+
+	/**
+	 * Count expected blobs (distinct blobs referenced by records).
+	 */
+	countExpectedBlobs(): number {
+		const rows = this.sql
+			.exec("SELECT COUNT(DISTINCT blobCid) as count FROM record_blob")
+			.toArray();
+		return rows.length > 0 ? ((rows[0]!.count as number) ?? 0) : 0;
+	}
+
+	/**
+	 * Count imported blobs.
+	 */
+	countImportedBlobs(): number {
+		const rows = this.sql
+			.exec("SELECT COUNT(*) as count FROM imported_blobs")
+			.toArray();
+		return rows.length > 0 ? ((rows[0]!.count as number) ?? 0) : 0;
+	}
+
+	/**
+	 * List blobs that are referenced but not yet imported.
+	 */
+	listMissingBlobs(
+		limit: number = 500,
+		cursor?: string,
+	): { blobs: Array<{ cid: string; recordUri: string }>; cursor?: string } {
+		const blobs: Array<{ cid: string; recordUri: string }> = [];
+
+		// Get blobs referenced but not in imported_blobs
+		const query = cursor
+			? `SELECT rb.blobCid, rb.recordUri FROM record_blob rb
+				 LEFT JOIN imported_blobs ib ON rb.blobCid = ib.cid
+				 WHERE ib.cid IS NULL AND rb.blobCid > ?
+				 ORDER BY rb.blobCid
+				 LIMIT ?`
+			: `SELECT rb.blobCid, rb.recordUri FROM record_blob rb
+				 LEFT JOIN imported_blobs ib ON rb.blobCid = ib.cid
+				 WHERE ib.cid IS NULL
+				 ORDER BY rb.blobCid
+				 LIMIT ?`;
+
+		const rows = cursor
+			? this.sql.exec(query, cursor, limit + 1).toArray()
+			: this.sql.exec(query, limit + 1).toArray();
+
+		for (const row of rows.slice(0, limit)) {
+			blobs.push({
+				cid: row.blobCid as string,
+				recordUri: row.recordUri as string,
+			});
+		}
+
+		const hasMore = rows.length > limit;
+		const nextCursor = hasMore ? blobs[blobs.length - 1]?.cid : undefined;
+
+		return { blobs, cursor: nextCursor };
+	}
+
+	/**
+	 * Clear all blob tracking data (for testing).
+	 */
+	clearBlobTracking(): void {
+		this.sql.exec("DELETE FROM record_blob");
+		this.sql.exec("DELETE FROM imported_blobs");
 	}
 }

@@ -140,6 +140,9 @@ app.get("/xrpc/com.atproto.sync.getRepo", (c) =>
 app.get("/xrpc/com.atproto.sync.getRepoStatus", (c) =>
 	sync.getRepoStatus(c, getAccountDO(c.env)),
 );
+app.get("/xrpc/com.atproto.sync.getBlocks", (c) =>
+	sync.getBlocks(c, getAccountDO(c.env)),
+);
 app.get("/xrpc/com.atproto.sync.getBlob", (c) =>
 	sync.getBlob(c, getAccountDO(c.env)),
 );
@@ -195,6 +198,9 @@ app.post("/xrpc/com.atproto.repo.putRecord", requireAuth, (c) =>
 app.post("/xrpc/com.atproto.repo.importRepo", requireAuth, (c) =>
 	repo.importRepo(c, getAccountDO(c.env)),
 );
+app.get("/xrpc/com.atproto.repo.listMissingBlobs", requireAuth, (c) =>
+	repo.listMissingBlobs(c, getAccountDO(c.env)),
+);
 
 // Server identity
 app.get("/xrpc/com.atproto.server.describeServer", server.describeServer);
@@ -214,9 +220,18 @@ app.post("/xrpc/com.atproto.server.refreshSession", server.refreshSession);
 app.get("/xrpc/com.atproto.server.getSession", server.getSession);
 app.post("/xrpc/com.atproto.server.deleteSession", server.deleteSession);
 
-// Account migration
+// Account lifecycle
 app.get("/xrpc/com.atproto.server.getAccountStatus", requireAuth, (c) =>
 	server.getAccountStatus(c, getAccountDO(c.env)),
+);
+app.post("/xrpc/com.atproto.server.activateAccount", requireAuth, (c) =>
+	server.activateAccount(c, getAccountDO(c.env)),
+);
+app.post("/xrpc/com.atproto.server.deactivateAccount", requireAuth, (c) =>
+	server.deactivateAccount(c, getAccountDO(c.env)),
+);
+app.post("/xrpc/gg.mk.experimental.resetMigration", requireAuth, (c) =>
+	server.resetMigration(c, getAccountDO(c.env)),
 );
 
 // Service auth - used by clients to get JWTs for external services (video, etc.)

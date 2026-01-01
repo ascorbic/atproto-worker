@@ -54,31 +54,45 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 /**
- * Prompt for password with confirmation
+ * Prompt for password with confirmation (max 3 attempts)
  */
-export async function promptPassword(): Promise<string> {
-	const password = await p.password({
-		message: "Enter password:",
-	});
-	if (p.isCancel(password)) {
-		p.cancel("Cancelled");
-		process.exit(0);
+export async function promptPassword(handle?: string): Promise<string> {
+	const message = handle
+		? `Choose a password for @${handle}:`
+		: "Enter password:";
+
+	const MAX_ATTEMPTS = 3;
+	let attempts = 0;
+
+	while (attempts < MAX_ATTEMPTS) {
+		attempts++;
+		const password = await p.password({
+			message,
+		});
+		if (p.isCancel(password)) {
+			p.cancel("Cancelled");
+			process.exit(0);
+		}
+
+		const confirm = await p.password({
+			message: "Confirm password:",
+		});
+		if (p.isCancel(confirm)) {
+			p.cancel("Cancelled");
+			process.exit(0);
+		}
+
+		if (password === confirm) {
+			return password;
+		}
+
+		p.log.error("Passwords do not match. Try again.");
 	}
 
-	const confirm = await p.password({
-		message: "Confirm password:",
-	});
-	if (p.isCancel(confirm)) {
-		p.cancel("Cancelled");
-		process.exit(0);
-	}
-
-	if (password !== confirm) {
-		p.log.error("Passwords do not match");
-		process.exit(1);
-	}
-
-	return password;
+	// Max attempts reached
+	p.log.error("Too many failed attempts.");
+	p.cancel("Password setup cancelled");
+	process.exit(1);
 }
 
 /**

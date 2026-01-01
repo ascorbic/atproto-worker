@@ -6,7 +6,12 @@ import { spawn } from "node:child_process";
 // Wrangler exports these experimental APIs for config manipulation
 import { experimental_patchConfig, experimental_readRawConfig } from "wrangler";
 
-export type VarName = "PDS_HOSTNAME" | "DID" | "HANDLE" | "SIGNING_KEY_PUBLIC";
+export type VarName =
+	| "PDS_HOSTNAME"
+	| "DID"
+	| "HANDLE"
+	| "SIGNING_KEY_PUBLIC"
+	| "INITIAL_ACTIVE";
 export type SecretName =
 	| "AUTH_TOKEN"
 	| "SIGNING_KEY"
@@ -45,6 +50,25 @@ export function setVars(vars: Partial<Record<VarName, string>>): void {
 export function getVars(): Record<string, string> {
 	const { rawConfig } = experimental_readRawConfig({});
 	return (rawConfig.vars as Record<string, string>) || {};
+}
+
+/**
+ * Get current worker name from wrangler config
+ */
+export function getWorkerName(): string | undefined {
+	const { rawConfig } = experimental_readRawConfig({});
+	return rawConfig.name as string | undefined;
+}
+
+/**
+ * Set worker name in wrangler config
+ */
+export function setWorkerName(name: string): void {
+	const { configPath } = experimental_readRawConfig({});
+	if (!configPath) {
+		throw new Error("No wrangler config found");
+	}
+	experimental_patchConfig(configPath, { name });
 }
 
 /**

@@ -15,12 +15,15 @@
 	},
 	"scripts": {
 		"build": "tsdown",
-		"test": "vitest run",
+		"test": "pnpm run test:unit && pnpm run test:cli",
+		"test:unit": "vitest run",
 		"test:cli": "vitest run --config vitest.config.cli.ts",
+		"test:e2e": "vitest run --config vitest.config.e2e.ts",
 		"check": "publint && attw --pack --ignore-rules=cjs-resolves-to-esm"
 	},
 	"dependencies": {
 		"@ascorbic/atproto-oauth-provider": "workspace:*",
+		"@atproto-labs/handle-resolver": "^0.3.4",
 		"@atproto/common-web": "^0.4.7",
 		"@atproto/crypto": "^0.4.5",
 		"@atproto/identity": "^0.4.10",
@@ -33,10 +36,13 @@
 		"bcryptjs": "^3.0.3",
 		"citty": "^0.1.6",
 		"hono": "^4.11.3",
-		"jose": "^6.1.3"
+		"jose": "^6.1.3",
+		"picocolors": "^1.1.1"
 	},
 	"devDependencies": {
 		"@arethetypeswrong/cli": "^0.18.2",
+		"@atproto/api": "^0.18.9",
+		"@cloudflare/vite-plugin": "^1.17.0",
 		"@cloudflare/vitest-pool-workers": "https://pkg.pr.new/@cloudflare/vitest-pool-workers@11632",
 		"@cloudflare/workers-types": "^4.20251225.0",
 		"@ipld/car": "^5.4.2",
@@ -45,6 +51,7 @@
 		"tsdown": "^0.18.3",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
+		"vite": "^6.4.1",
 		"vitest": "^4.0.0",
 		"wrangler": "^4.54.0",
 		"ws": "^8.18.3"

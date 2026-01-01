@@ -430,7 +430,7 @@ export const migrateCommand = defineCommand({
 			// Use clack progress bar for transferring
 			const progressBar = p.progress({
 				max: totalBlobs,
-				style: 'block',
+				style: 'heavy',
 				size: 30
 			});
 			progressBar.start("Transferring images");
@@ -447,7 +447,7 @@ export const migrateCommand = defineCommand({
 						);
 						await targetClient.uploadBlob(bytes, mimeType);
 						synced++;
-						progressBar.advance(1, `${synced}/${totalBlobs} images transferred`);
+						progressBar.advance(1, `${pc.green(formatNumber(synced))}/${formatNumber(totalBlobs)} images transferred`);
 					} catch (err) {
 						synced++;
 						failedBlobs.push(blob.cid);

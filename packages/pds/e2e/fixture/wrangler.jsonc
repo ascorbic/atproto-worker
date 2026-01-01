@@ -3,6 +3,9 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2025-01-01",
 	"compatibility_flags": ["nodejs_compat"],
+	"dev": {
+		"inspector_port": 0
+	},
 	"durable_objects": {
 		"bindings": [
 			{ "name": "ACCOUNT", "class_name": "AccountDurableObject" }

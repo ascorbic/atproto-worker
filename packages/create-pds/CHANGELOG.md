@@ -1,5 +1,11 @@
 # create-pds
 
+## 0.0.4
+
+### Patch Changes
+
+- [#33](https://github.com/ascorbic/atproto-worker/pull/33) [`4f5b50c`](https://github.com/ascorbic/atproto-worker/commit/4f5b50c4911514f0f87dc3f3856a2b4e2ccb9b4d) Thanks [@ascorbic](https://github.com/ascorbic)! - Improve UX with clearer prompts
+
 ## 0.0.3
 
 ### Patch Changes

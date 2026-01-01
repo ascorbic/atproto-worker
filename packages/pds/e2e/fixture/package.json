@@ -4,7 +4,7 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"dev": "NO_INSPECTOR=1 vite"
+		"dev": "vite"
 	},
 	"dependencies": {
 		"@ascorbic/pds": "{{PDS_PACKAGE_PATH}}"

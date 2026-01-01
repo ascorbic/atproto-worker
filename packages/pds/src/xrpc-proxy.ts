@@ -230,5 +230,30 @@ export async function handleXrpcProxy(
 		reqInit.body = c.req.raw.body;
 	}
 
-	return fetch(targetUrl.toString(), reqInit);
+	// Fetch from upstream service
+	const upstreamResponse = await fetch(targetUrl.toString(), reqInit);
+
+	// Create a new response with proper CORS headers for mobile compatibility
+	// Mobile apps require explicit CORS headers even for same-origin requests
+	const responseHeaders = new Headers(upstreamResponse.headers);
+
+	// Ensure CORS headers are set (critical for mobile apps)
+	if (!responseHeaders.has("Access-Control-Allow-Origin")) {
+		responseHeaders.set("Access-Control-Allow-Origin", "*");
+	}
+	if (!responseHeaders.has("Access-Control-Allow-Methods")) {
+		responseHeaders.set(
+			"Access-Control-Allow-Methods",
+			"GET, POST, PUT, DELETE, OPTIONS",
+		);
+	}
+	if (!responseHeaders.has("Access-Control-Allow-Headers")) {
+		responseHeaders.set("Access-Control-Allow-Headers", "*");
+	}
+
+	return new Response(upstreamResponse.body, {
+		status: upstreamResponse.status,
+		statusText: upstreamResponse.statusText,
+		headers: responseHeaders,
+	});
 }

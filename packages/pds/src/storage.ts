@@ -39,8 +39,22 @@ export class SqliteRepoStorage
 				seq INTEGER NOT NULL DEFAULT 0,
 				active INTEGER NOT NULL DEFAULT 1
 			);
+		`);
 
-			-- Initialize with empty state if not exists
+		// Migration: Add 'active' column if it doesn't exist (for existing deployments)
+		const columns = this.sql
+			.exec("PRAGMA table_info(repo_state)")
+			.toArray() as { name: string }[];
+		const hasActiveColumn = columns.some((col) => col.name === "active");
+
+		if (!hasActiveColumn) {
+			this.sql.exec(
+				`ALTER TABLE repo_state ADD COLUMN active INTEGER NOT NULL DEFAULT 1`,
+			);
+		}
+
+		// Initialize with empty state if not exists
+		this.sql.exec(`
 			INSERT OR IGNORE INTO repo_state (id, root_cid, rev, seq, active)
 			VALUES (1, NULL, NULL, 0, ${initialActive ? 1 : 0});
 

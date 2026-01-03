@@ -42,21 +42,19 @@ This scaffolds a new project, installs dependencies, and runs the setup wizard. 
 
 ## Status
 
-This is beta software under active development. Core functionality is complete and tested:
+This is beta software under active development, but the core features are functional:
 
-- ✅ Repository operations (create, read, update, delete records)
-- ✅ Federation (sync, firehose, blob storage)
-- ✅ OAuth 2.1 provider (PKCE, DPoP, PAR)
-- ✅ Account migration from existing PDS
-- ✅ 140+ tests passing
+- Repository operations (create, read, update, delete records)
+- Federation (sync, firehose, blob storage)
+- OAuth 2.1 provider (PKCE, DPoP, PAR)
+- Account migration from existing PDS
 
 See the [PDS documentation](./packages/pds/) for current limitations and roadmap.
 
 ## Requirements
 
-- Cloudflare account with Workers, Durable Objects, and R2 enabled
+- Cloudflare account with R2 enabled
 - A domain you control (for your handle and DID)
-- Node.js 18+ for local development
 
 ## Resources
 
@@ -66,4 +64,4 @@ See the [PDS documentation](./packages/pds/) for current limitations and roadmap
 
 ## License
 
-MIT
+MIT. © Matt Kane (@ascorbic)

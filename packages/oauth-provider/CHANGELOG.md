@@ -1,5 +1,11 @@
 # @getcirrus/oauth-provider
 
+## 0.1.2
+
+### Patch Changes
+
+- [#47](https://github.com/ascorbic/cirrus/pull/47) [`b4de6fa`](https://github.com/ascorbic/cirrus/commit/b4de6fa1117d37a6df4fa271404544f883757e07) Thanks [@ascorbic](https://github.com/ascorbic)! - Rename to Cirrus
+
 ## 0.1.1
 
 ### Patch Changes

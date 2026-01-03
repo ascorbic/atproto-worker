@@ -1,24 +1,66 @@
-# @ascorbic/pds
+# AT Protocol PDS on Cloudflare Workers
 
-A single-user [AT Protocol](https://atproto.com) Personal Data Server (PDS) that runs on Cloudflare Workers. Host your own Bluesky identity with minimal infrastructure.
+A single-user [AT Protocol](https://atproto.com) Personal Data Server (PDS) that runs entirely on Cloudflare's edge infrastructure. Host your Bluesky identity on your own domain with minimal operational overhead.
 
-> **⚠️ Experimental Software**
->
-> This is an early-stage project under active development. **You cannot migrate your main Bluesky account to this PDS yet.** Use a test account or create a new identity for experimentation. Data loss, breaking changes, and missing features are expected.
+## Why run your own PDS?
 
-## What is this?
+A PDS is where Bluesky data lives – posts, follows, profile, and media. Running a personal PDS provides:
 
-A PDS is where your Bluesky data lives – your posts, follows, profile, and media. This package lets you run your own PDS on Cloudflare Workers, giving you control over your data and identity.
+- **Independence from platform changes** – If Bluesky's ownership or policies change, the account remains under full control. No billionaire can take it away.
+- **Network resilience** – A diverse ecosystem of PDS providers makes the AT Protocol network stronger. More independent servers mean no single point of failure.
+- **Data sovereignty** – The repository lives on infrastructure under direct control
+- **Portability** – Move between hosting providers without losing followers or identity
+
+## Architecture
+
+This implementation uses Cloudflare Workers with Durable Objects and R2:
+
+- **Worker** – Stateless edge handler for routing, authentication, and DID document serving
+- **Durable Object** – Single-instance SQLite storage for your AT Protocol repository
+- **R2** – Object storage for blobs (images, videos)
+
+The result is a PDS that runs at the edge with no servers to manage, automatic scaling, and pay-per-use pricing.
 
 ## Quick Start
-
-The fastest way to get started:
 
 ```bash
 npm create pds
 ```
 
+This scaffolds a new project, installs dependencies, and runs the setup wizard. See the [PDS package documentation](./packages/pds/) for detailed setup and configuration.
+
 ## Packages
 
-- [`@ascorbic/pds`](./packages/pds/) - The main PDS library
-- [`create-pds`](./packages/create-pds/) - A CLI tool to scaffold a new PDS project
+| Package | Description |
+|---------|-------------|
+| [`@ascorbic/pds`](./packages/pds/) | The PDS implementation – handles repository operations, federation, OAuth, and the CLI |
+| [`@ascorbic/atproto-oauth-provider`](./packages/oauth-provider/) | OAuth 2.1 provider for "Login with Bluesky" |
+| [`create-pds`](./packages/create-pds/) | Scaffolding CLI to create new PDS projects |
+
+## Status
+
+This is beta software under active development. Core functionality is complete and tested:
+
+- ✅ Repository operations (create, read, update, delete records)
+- ✅ Federation (sync, firehose, blob storage)
+- ✅ OAuth 2.1 provider (PKCE, DPoP, PAR)
+- ✅ Account migration from existing PDS
+- ✅ 140+ tests passing
+
+See the [PDS documentation](./packages/pds/) for current limitations and roadmap.
+
+## Requirements
+
+- Cloudflare account with Workers, Durable Objects, and R2 enabled
+- A domain you control (for your handle and DID)
+- Node.js 18+ for local development
+
+## Resources
+
+- [AT Protocol Documentation](https://atproto.com)
+- [Bluesky](https://bsky.app)
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/)
+
+## License
+
+MIT

@@ -1,5 +1,15 @@
 # @getcirrus/oauth-provider
 
+## 0.1.1
+
+### Patch Changes
+
+- [#48](https://github.com/ascorbic/cirrus/pull/48) [`8362bae`](https://github.com/ascorbic/cirrus/commit/8362bae095b37cdf4a4d9c5232fe3ed55d201531) Thanks [@ascorbic](https://github.com/ascorbic)! - Deprecate packages in favor of @getcirrus/pds and @getcirrus/oauth-provider
+
+  These packages have been renamed and will no longer receive updates under the @ascorbic scope. Please migrate to the new package names:
+  - `@ascorbic/pds` → `@getcirrus/pds`
+  - `@ascorbic/atproto-oauth-provider` → `@getcirrus/oauth-provider`
+
 ## 0.1.0
 
 ### Minor Changes

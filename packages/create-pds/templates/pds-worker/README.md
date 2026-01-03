@@ -1,4 +1,4 @@
-# Personal PDS on Cloudflare Workers
+# Your Personal PDS
 
 A single-user AT Protocol Personal Data Server running on Cloudflare Workers.
 
@@ -6,26 +6,29 @@ A single-user AT Protocol Personal Data Server running on Cloudflare Workers.
 >
 > This is an early-stage project under active development. **Do not migrate your main Bluesky account to this PDS yet.** Use a test account or create a new identity for experimentation.
 
-## Setup
+## Getting Started
 
 ### 1. Install dependencies
 
 ```bash
 pnpm install
+# or: npm install / yarn install
 ```
 
-### 2. Configure environment
+### 2. Configure the PDS
 
-If you haven't already, run the setup wizard:
+Run the setup wizard if not already done:
 
 ```bash
 pnpm pds init
-# or
-npm run pds init
-yarn pds init
 ```
 
-This prompts for your hostname, handle, and password, then writes configuration to `.dev.vars`.
+This prompts for:
+- **PDS hostname** – The deployment domain (e.g., `pds.example.com`)
+- **Handle** – The Bluesky username (e.g., `alice.example.com`)
+- **Password** – For logging in from Bluesky apps
+
+The wizard generates cryptographic keys and writes configuration to `.dev.vars` and `wrangler.jsonc`.
 
 ### 3. Run locally
 
@@ -33,21 +36,20 @@ This prompts for your hostname, handle, and password, then writes configuration 
 pnpm dev
 ```
 
-This starts a local development server at http://localhost:5173.
+The PDS is now running at http://localhost:5173. Test it with:
+
+```bash
+curl http://localhost:5173/health
+curl http://localhost:5173/.well-known/did.json
+```
 
 ### 4. Deploy to production
 
-First configure for production:
+First, push secrets to Cloudflare:
 
 ```bash
 pnpm pds init --production
-
-# or
-npm run pds init --production
-yarn pds init --production
 ```
-
-This sets vars in `wrangler.jsonc` and secrets via `wrangler secret put`.
 
 Then deploy:
 
@@ -55,38 +57,132 @@ Then deploy:
 pnpm run deploy
 ```
 
+Finally, configure DNS to point your domain to the worker.
+
+## Migrating an Existing Account
+
+To move an existing Bluesky account from bsky.social or another PDS:
+
+### 1. Configure for migration
+
+```bash
+pnpm pds init
+# Answer "Yes" when asked about migrating an existing account
+```
+
+### 2. Deploy and transfer the data
+
+```bash
+pnpm run deploy
+pnpm pds migrate
+```
+
+This downloads the repository (posts, follows, likes) and all images/videos from the current PDS.
+
+### 3. Update the identity
+
+Follow the [AT Protocol account migration guide](https://atproto.com/guides/account-migration) to update the DID document. This requires email verification from the current PDS.
+
+### 4. Go live
+
+```bash
+pnpm pds activate
+```
+
+The account is now live on the new PDS.
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `pnpm pds init` | Interactive setup wizard |
+| `pnpm pds init --production` | Deploy secrets to Cloudflare |
+| `pnpm pds migrate` | Transfer account from source PDS |
+| `pnpm pds migrate --clean` | Reset and re-import data |
+| `pnpm pds activate` | Enable writes (go live) |
+| `pnpm pds deactivate` | Disable writes (for re-import) |
+| `pnpm pds secret key` | Generate new signing keypair |
+| `pnpm pds secret jwt` | Generate new JWT secret |
+| `pnpm pds secret password` | Set account password |
+
+Add `--dev` to target your local development server instead of production.
+
 ## Configuration
 
-Configuration uses environment variables: vars in `wrangler.jsonc` and secrets.
+### Public Variables (wrangler.jsonc)
 
-**Vars (in wrangler.jsonc):**
+| Variable | Description |
+|----------|-------------|
+| `PDS_HOSTNAME` | Public hostname (e.g., pds.example.com) |
+| `DID` | Account DID |
+| `HANDLE` | Account handle |
+| `SIGNING_KEY_PUBLIC` | Public key for DID document |
 
-- `PDS_HOSTNAME` - Public hostname of the PDS
-- `DID` - Account DID (e.g., did:web:pds.example.com)
-- `HANDLE` - Account handle (e.g., alice.example.com)
-- `SIGNING_KEY_PUBLIC` - Public key for DID document (multibase)
+### Secrets (.dev.vars or Cloudflare)
 
-**Secrets (via wrangler):**
+| Variable | Description |
+|----------|-------------|
+| `AUTH_TOKEN` | Bearer token for API write operations |
+| `SIGNING_KEY` | Private signing key |
+| `JWT_SECRET` | Secret for session tokens |
+| `PASSWORD_HASH` | Bcrypt hash of the account password |
 
-- `AUTH_TOKEN` - Bearer token for API write operations
-- `SIGNING_KEY` - Private signing key (secp256k1 JWK)
-- `JWT_SECRET` - Secret for signing session JWTs
-- `PASSWORD_HASH` - Bcrypt hash of account password (for Bluesky app login)
+## Handle Verification
 
-## Endpoints
+Bluesky verifies control of the handle domain.
 
-Once deployed, your PDS serves:
+**If the handle matches the PDS hostname** (for example, both are `pds.example.com`):
+- No extra setup needed. The PDS handles verification automatically.
 
-- `GET /.well-known/did.json` - DID document
-- `GET /health` - Health check
-- `GET /xrpc/com.atproto.sync.getRepo` - Export repository as CAR
-- `GET /xrpc/com.atproto.sync.subscribeRepos` - WebSocket firehose
-- `POST /xrpc/com.atproto.repo.createRecord` - Create a record (authenticated)
-- `POST /xrpc/com.atproto.repo.uploadBlob` - Upload a blob (authenticated)
-- And more...
+**If the handle is on a different domain** (for example, handle `alice.example.com`, PDS at `pds.example.com`):
+
+Add a DNS TXT record:
+
+```
+_atproto.alice.example.com  TXT  "did=did:web:pds.example.com"
+```
+
+Verify with:
+
+```bash
+dig TXT _atproto.alice.example.com
+```
+
+## Project Structure
+
+```
+├── src/
+│   └── index.ts          # Worker entry point (re-exports PDS)
+├── wrangler.jsonc        # Cloudflare Worker configuration
+├── .dev.vars             # Local secrets (not committed)
+└── package.json
+```
+
+## Troubleshooting
+
+### "PDS not responding"
+
+Ensure the worker is deployed (`pnpm run deploy`) or the dev server is running (`pnpm dev`).
+
+### "Failed to resolve handle"
+
+Check the handle configuration:
+- For DNS verification: ensure the TXT record has propagated (`dig TXT _atproto.yourhandle.com`)
+- For same-domain handles: ensure the PDS is accessible at `https://yourdomain.com/.well-known/atproto-did`
+
+### Migration issues
+
+If migration fails partway through:
+- Run `pnpm pds migrate` again to resume from where you left off
+- Use `pnpm pds migrate --clean` to start fresh (only on deactivated accounts)
 
 ## Resources
 
-- [AT Protocol Docs](https://atproto.com)
+- [AT Protocol Documentation](https://atproto.com)
 - [Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)
-- [@ascorbic/pds on GitHub](https://github.com/ascorbic/atproto-worker)
+- [@ascorbic/pds Documentation](https://github.com/ascorbic/atproto-worker/tree/main/packages/pds)
+- [Account Migration Guide](https://atproto.com/guides/account-migration)
+
+## License
+
+MIT

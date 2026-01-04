@@ -2,6 +2,6 @@
 "@getcirrus/oauth-provider": patch
 ---
 
-Fix CSP blocking OAuth form submission in some browsers
+Fix CSP blocking OAuth authorization flow in Chrome
 
-The `form-action 'self'` CSP directive was blocking form submissions during OAuth authorization in some browser configurations. This change makes the CSP dynamic by explicitly including the issuer URL alongside `'self'` to ensure cross-browser compatibility.
+Remove `form-action` from CSP due to inconsistent browser behavior with redirects. Chrome blocks redirects after form submission if the redirect URL isn't in `form-action`, while Firefox does not. Since OAuth requires redirecting to the client's callback URL after consent, `form-action` cannot be used without breaking the flow in Chrome.

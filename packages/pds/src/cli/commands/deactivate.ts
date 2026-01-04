@@ -9,6 +9,26 @@ import { readDevVars } from "../utils/dotenv.js";
 import { PDSClient } from "../utils/pds-client.js";
 import { getTargetUrl, getDomain } from "../utils/cli-helpers.js";
 
+type PackageManager = "npm" | "yarn" | "pnpm" | "bun";
+
+function detectPackageManager(): PackageManager {
+	const userAgent = process.env.npm_config_user_agent || "";
+	if (userAgent.startsWith("yarn")) return "yarn";
+	if (userAgent.startsWith("pnpm")) return "pnpm";
+	if (userAgent.startsWith("bun")) return "bun";
+	return "npm";
+}
+
+function formatCommand(pm: PackageManager, ...args: string[]): string {
+	// npm always needs "run" for scripts
+	// pnpm/yarn/bun can use shorthand, except for "deploy" which conflicts with pnpm's built-in deploy command
+	const needsRun = pm === "npm" || args[0] === "deploy";
+	if (needsRun) {
+		return `${pm} run ${args.join(" ")}`;
+	}
+	return `${pm} ${args.join(" ")}`;
+}
+
 // Helper to override clack's dim styling in notes
 const brightNote = (lines: string[]) => lines.map((l) => `\x1b[0m${l}`).join("\n");
 const bold = (text: string) => pc.bold(text);
@@ -26,6 +46,7 @@ export const deactivateCommand = defineCommand({
 		},
 	},
 	async run({ args }) {
+		const pm = detectPackageManager();
 		const isDev = args.dev;
 
 		p.intro("🦋 Deactivate Account");
@@ -69,7 +90,7 @@ export const deactivateCommand = defineCommand({
 			spinner.stop(`PDS not responding at ${targetDomain}`);
 			p.log.error(`Your PDS isn't responding at ${targetUrl}`);
 			if (!isDev) {
-				p.log.info("Make sure your worker is deployed: wrangler deploy");
+				p.log.info(`Make sure your worker is deployed: ${formatCommand(pm, "deploy")}`);
 			}
 			p.outro("Deactivation cancelled.");
 			process.exit(1);
@@ -133,10 +154,10 @@ export const deactivateCommand = defineCommand({
 		p.log.info("Writes are now disabled.");
 		p.log.info("");
 		p.log.info("To re-import your data:");
-		p.log.info("  pnpm pds migrate --clean");
+		p.log.info(`  ${formatCommand(pm, "pds", "migrate", "--clean")}`);
 		p.log.info("");
 		p.log.info("To re-enable writes:");
-		p.log.info("  pnpm pds activate");
+		p.log.info(`  ${formatCommand(pm, "pds", "activate")}`);
 		p.outro("Deactivated.");
 	},
 });

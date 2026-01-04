@@ -22,6 +22,16 @@ function detectPackageManager(): PackageManager {
 	return "npm";
 }
 
+function formatCommand(pm: PackageManager, ...args: string[]): string {
+	// npm always needs "run" for scripts
+	// pnpm/yarn/bun can use shorthand, except for "deploy" which conflicts with pnpm's built-in deploy command
+	const needsRun = pm === "npm" || args[0] === "deploy";
+	if (needsRun) {
+		return `${pm} run ${args.join(" ")}`;
+	}
+	return `${pm} ${args.join(" ")}`;
+}
+
 // Helper to override clack's dim styling in notes
 const brightNote = (lines: string[]) =>
 	lines.map((l) => `\x1b[0m${l}`).join("\n");
@@ -60,8 +70,7 @@ export const migrateCommand = defineCommand({
 		},
 	},
 	async run({ args }) {
-		const packageManager = detectPackageManager();
-		const pm = packageManager === "npm" ? "npm run" : packageManager;
+		const pm = detectPackageManager();
 		const isDev = args.dev;
 
 		// Get target URL
@@ -89,11 +98,11 @@ export const migrateCommand = defineCommand({
 			spinner.stop(`PDS not responding at ${targetDomain}`);
 			if (isDev) {
 				p.log.error(`Your local PDS isn't running at ${targetUrl}`);
-				p.log.info(`Start it with: ${pm} dev`);
+				p.log.info(`Start it with: ${formatCommand(pm, "dev")}`);
 			} else {
 				p.log.error(`Your PDS isn't responding at ${targetUrl}`);
-				p.log.info("Make sure your worker is deployed: wrangler deploy");
-				p.log.info(`Or test locally first: ${pm} pds migrate --dev`);
+				p.log.info(`Make sure your worker is deployed: ${formatCommand(pm, "deploy")}`);
+				p.log.info(`Or test locally first: ${formatCommand(pm, "pds", "migrate", "--dev")}`);
 			}
 			p.outro("Migration cancelled.");
 			process.exit(1);
@@ -171,7 +180,7 @@ export const migrateCommand = defineCommand({
 				p.log.info("Your account is already live");
 				p.log.info("");
 				p.log.info("If you need to re-import, first deactivate:");
-				p.log.info("  pnpm pds deactivate");
+				p.log.info(`  ${formatCommand(pm, "pds", "deactivate")}`);
 				p.outro("Migration cancelled.");
 				process.exit(1);
 			}
@@ -492,7 +501,7 @@ export const migrateCommand = defineCommand({
 	},
 });
 
-function showNextSteps(pm: string, sourceDomain: string): void {
+function showNextSteps(pm: PackageManager, sourceDomain: string): void {
 	p.note(
 		brightNote([
 			pc.bold("Your data is safe in your new PDS."),
@@ -503,7 +512,7 @@ function showNextSteps(pm: string, sourceDomain: string): void {
 			`   (Requires email verification from ${sourceDomain})`,
 			"",
 			pc.bold("2. Flip the switch"),
-			`   ${pm} pds activate`,
+			`   ${formatCommand(pm, "pds", "activate")}`,
 			"",
 			"Docs: https://atproto.com/guides/account-migration",
 		]),

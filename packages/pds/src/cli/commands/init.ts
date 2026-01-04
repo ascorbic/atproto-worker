@@ -67,6 +67,26 @@ import {
 	promptPassword,
 	setSecretValue,
 } from "../utils/secrets.js";
+
+type PackageManager = "npm" | "yarn" | "pnpm" | "bun";
+
+function detectPackageManager(): PackageManager {
+	const userAgent = process.env.npm_config_user_agent || "";
+	if (userAgent.startsWith("yarn")) return "yarn";
+	if (userAgent.startsWith("pnpm")) return "pnpm";
+	if (userAgent.startsWith("bun")) return "bun";
+	return "npm";
+}
+
+function formatCommand(pm: PackageManager, ...args: string[]): string {
+	// npm always needs "run" for scripts
+	// pnpm/yarn/bun can use shorthand, except for "deploy" which conflicts with pnpm's built-in deploy command
+	const needsRun = pm === "npm" || args[0] === "deploy";
+	if (needsRun) {
+		return `${pm} run ${args.join(" ")}`;
+	}
+	return `${pm} ${args.join(" ")}`;
+}
 import { resolveHandleToDid } from "../utils/handle-resolver.js";
 import { DidResolver } from "../../did-resolver.js";
 
@@ -115,6 +135,8 @@ export const initCommand = defineCommand({
 		},
 	},
 	async run({ args }) {
+		const pm = detectPackageManager();
+
 		p.intro("🦋 PDS Setup");
 
 		const isProduction = args.production;
@@ -492,13 +514,15 @@ export const initCommand = defineCommand({
 						? "Deploy your worker and run the migration:"
 						: "Push secrets, deploy, and run the migration:",
 					"",
-					...(deployedSecrets ? [] : ["  pnpm pds init --production", ""]),
-					"  wrangler deploy",
-					"  pnpm pds migrate",
+					...(deployedSecrets
+						? []
+						: [`  ${formatCommand(pm, "pds", "init", "--production")}`, ""]),
+					`  ${formatCommand(pm, "deploy")}`,
+					`  ${formatCommand(pm, "pds", "migrate")}`,
 					"",
 					"To test locally first:",
-					"  pnpm dev              # in one terminal",
-					"  pnpm pds migrate --dev  # in another",
+					`  ${formatCommand(pm, "dev")}              # in one terminal`,
+					`  ${formatCommand(pm, "pds", "migrate", "--dev")}  # in another`,
 					"",
 					"Then update your identity and flip the switch! 🦋",
 					"  https://atproto.com/guides/account-migration",
@@ -508,9 +532,9 @@ export const initCommand = defineCommand({
 		}
 
 		if (deployedSecrets) {
-			p.outro("Run 'wrangler deploy' to launch your PDS! 🚀");
+			p.outro(`Run '${formatCommand(pm, "deploy")}' to launch your PDS! 🚀`);
 		} else {
-			p.outro("Run 'pnpm dev' to start your PDS locally! 🦋");
+			p.outro(`Run '${formatCommand(pm, "dev")}' to start your PDS locally! 🦋`);
 		}
 	},
 });

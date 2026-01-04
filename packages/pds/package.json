@@ -28,7 +28,6 @@
 		"@atcute/identity": "^1.1.3",
 		"@atcute/identity-resolver": "^1.2.2",
 		"@atcute/tid": "^1.1.1",
-		"@atproto/common-web": "^0.4.7",
 		"@atproto/crypto": "^0.4.5",
 		"@atproto/lex-cbor": "^0.0.3",
 		"@atproto/lex-data": "^0.0.3",

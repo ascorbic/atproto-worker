@@ -119,6 +119,18 @@ export function setAccountId(accountId: string): void {
 	experimental_patchConfig(configPath, { account_id: accountId });
 }
 
+/**
+ * Set custom domain routes in wrangler config
+ */
+export function setCustomDomains(domains: string[]): void {
+	const { configPath } = experimental_readRawConfig({});
+	if (!configPath) {
+		throw new Error("No wrangler config found");
+	}
+	const routes = domains.map((pattern) => ({ pattern, custom_domain: true }));
+	experimental_patchConfig(configPath, { routes });
+}
+
 export interface CloudflareAccount {
 	id: string;
 	name: string;

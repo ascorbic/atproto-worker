@@ -13,7 +13,7 @@ import {
 import type { RepoRecord } from "@atproto/lexicon";
 import { Secp256k1Keypair } from "@atproto/crypto";
 import { CID, isCid, asCid, isBlobRef } from "@atproto/lex-data";
-import { TID } from "@atproto/common-web";
+import { now as tidNow } from "@atcute/tid";
 import { AtUri } from "@atproto/syntax";
 import { encode as cborEncode } from "./cbor-compat";
 import { SqliteRepoStorage } from "./storage";
@@ -283,7 +283,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		const repo = await this.getRepo();
 		const keypair = await this.getKeypair();
 
-		const actualRkey = rkey || TID.nextStr();
+		const actualRkey = rkey || tidNow();
 		const createOp: RecordCreateOp = {
 			action: WriteOpAction.Create,
 			collection,
@@ -534,7 +534,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 
 		for (const write of writes) {
 			if (write.$type === "com.atproto.repo.applyWrites#create") {
-				const rkey = write.rkey || TID.nextStr();
+				const rkey = write.rkey || tidNow();
 				const op: RecordCreateOp = {
 					action: WriteOpAction.Create,
 					collection: write.collection,
@@ -770,7 +770,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		const { root: rootCid, blocks } = await readCarWithRoot(carBytes);
 
 		// Import all blocks into storage using putMany (more efficient than individual putBlock)
-		const importRev = TID.nextStr();
+		const importRev = tidNow();
 		await this.storage!.putMany(blocks, importRev);
 
 		// Load the repo to verify it's valid and get the actual revision

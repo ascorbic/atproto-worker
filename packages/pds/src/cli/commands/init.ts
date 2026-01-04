@@ -15,6 +15,8 @@ import {
 	promptText,
 	promptConfirm,
 	promptSelect,
+	detectPackageManager,
+	formatCommand,
 } from "../utils/cli-helpers.js";
 
 /**
@@ -68,25 +70,6 @@ import {
 	setSecretValue,
 } from "../utils/secrets.js";
 
-type PackageManager = "npm" | "yarn" | "pnpm" | "bun";
-
-function detectPackageManager(): PackageManager {
-	const userAgent = process.env.npm_config_user_agent || "";
-	if (userAgent.startsWith("yarn")) return "yarn";
-	if (userAgent.startsWith("pnpm")) return "pnpm";
-	if (userAgent.startsWith("bun")) return "bun";
-	return "npm";
-}
-
-function formatCommand(pm: PackageManager, ...args: string[]): string {
-	// npm always needs "run" for scripts
-	// pnpm/yarn/bun can use shorthand, except for "deploy" which conflicts with pnpm's built-in deploy command
-	const needsRun = pm === "npm" || args[0] === "deploy";
-	if (needsRun) {
-		return `${pm} run ${args.join(" ")}`;
-	}
-	return `${pm} ${args.join(" ")}`;
-}
 import { resolveHandleToDid } from "../utils/handle-resolver.js";
 import { DidResolver } from "../../did-resolver.js";
 

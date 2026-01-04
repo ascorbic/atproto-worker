@@ -7,27 +7,12 @@ import pc from "picocolors";
 import { getVars } from "../utils/wrangler.js";
 import { readDevVars } from "../utils/dotenv.js";
 import { PDSClient } from "../utils/pds-client.js";
-import { getTargetUrl, getDomain } from "../utils/cli-helpers.js";
-
-type PackageManager = "npm" | "yarn" | "pnpm" | "bun";
-
-function detectPackageManager(): PackageManager {
-	const userAgent = process.env.npm_config_user_agent || "";
-	if (userAgent.startsWith("yarn")) return "yarn";
-	if (userAgent.startsWith("pnpm")) return "pnpm";
-	if (userAgent.startsWith("bun")) return "bun";
-	return "npm";
-}
-
-function formatCommand(pm: PackageManager, ...args: string[]): string {
-	// npm always needs "run" for scripts
-	// pnpm/yarn/bun can use shorthand, except for "deploy" which conflicts with pnpm's built-in deploy command
-	const needsRun = pm === "npm" || args[0] === "deploy";
-	if (needsRun) {
-		return `${pm} run ${args.join(" ")}`;
-	}
-	return `${pm} ${args.join(" ")}`;
-}
+import {
+	getTargetUrl,
+	getDomain,
+	detectPackageManager,
+	formatCommand,
+} from "../utils/cli-helpers.js";
 
 // Helper to override clack's dim styling in notes
 const brightNote = (lines: string[]) => lines.map((l) => `\x1b[0m${l}`).join("\n");

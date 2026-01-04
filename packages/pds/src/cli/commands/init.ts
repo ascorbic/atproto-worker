@@ -10,6 +10,7 @@ import {
 	getWorkerName,
 	setWorkerName,
 	setAccountId,
+	setCustomDomains,
 	detectCloudflareAccounts,
 	type SecretName,
 } from "../utils/wrangler.js";
@@ -464,6 +465,7 @@ export const initCommand = defineCommand({
 			SIGNING_KEY_PUBLIC: signingKeyPublic,
 			INITIAL_ACTIVE: initialActive,
 		});
+		setCustomDomains([hostname]);
 		spinner.stop("wrangler.jsonc updated");
 
 		// Set secrets

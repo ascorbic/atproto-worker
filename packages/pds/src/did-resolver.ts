@@ -11,6 +11,7 @@ import {
 	WebDidDocumentResolver,
 } from "@atcute/identity-resolver";
 import type { DidDocument } from "@atcute/identity";
+import type { Did } from "@atcute/lexicons/syntax";
 import type { DidCache } from "./did-cache";
 
 const PLC_DIRECTORY = "https://plc.directory";
@@ -86,10 +87,9 @@ export class DidResolver {
 
 		try {
 			// @atcute resolver throws on errors, we return null
-			const doc = await this.resolver.resolve(
-				did as `did:${"plc" | "web"}:${string}`,
-				{ signal: controller.signal },
-			);
+			const doc = await this.resolver.resolve(did as Did<"plc" | "web">, {
+				signal: controller.signal,
+			});
 			// Validate that the returned document matches the requested DID
 			if (doc.id !== did) {
 				return null;

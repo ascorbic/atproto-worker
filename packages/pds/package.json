@@ -36,7 +36,6 @@
 		"@atproto/lex-cbor": "^0.0.3",
 		"@atproto/lex-data": "^0.0.3",
 		"@atproto/repo": "^0.8.12",
-		"@atproto/syntax": "^0.4.2",
 		"@clack/prompts": "^0.11.0",
 		"@getcirrus/oauth-provider": "workspace:*",
 		"bcryptjs": "^3.0.3",

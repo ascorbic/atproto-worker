@@ -15,7 +15,7 @@ type RepoRecord = Record<string, unknown>;
 import { Secp256k1Keypair } from "@atproto/crypto";
 import { CID, isCid, asCid, isBlobRef } from "@atproto/lex-data";
 import { now as tidNow } from "@atcute/tid";
-import { AtUri } from "@atproto/syntax";
+import type { Did } from "@atcute/lexicons/syntax";
 import { encode as cborEncode } from "./cbor-compat";
 import { SqliteRepoStorage } from "./storage";
 import { SqliteOAuthStorage } from "./oauth-storage";
@@ -247,7 +247,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 			}
 
 			records.push({
-				uri: AtUri.make(repo.did, record.collection, record.rkey).toString(),
+				uri: `at://${repo.did}/${record.collection}/${record.rkey}`,
 				cid: record.cid.toString(),
 				value: serializeRecord(record.record),
 			});
@@ -338,7 +338,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		}
 
 		return {
-			uri: AtUri.make(this.repo.did, collection, actualRkey).toString(),
+			uri: `at://${this.repo.did}/${collection}/${actualRkey}`,
 			cid: recordCid.toString(),
 			commit: {
 				cid: this.repo.cid.toString(),
@@ -488,7 +488,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		}
 
 		return {
-			uri: AtUri.make(this.repo.did, collection, rkey).toString(),
+			uri: `at://${this.repo.did}/${collection}/${rkey}`,
 			cid: recordCid.toString(),
 			commit: {
 				cid: this.repo.cid.toString(),
@@ -615,11 +615,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 				const recordCid = await this.repo.data.get(dataKey);
 				finalResults.push({
 					$type: result.$type,
-					uri: AtUri.make(
-						this.repo.did,
-						result.collection,
-						result.rkey,
-					).toString(),
+					uri: `at://${this.repo.did}/${result.collection}/${result.rkey}`,
 					cid: recordCid?.toString(),
 					validationStatus: "valid",
 				});
@@ -796,11 +792,7 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		for await (const record of this.repo.walkRecords()) {
 			const blobCids = extractBlobCids(record.record);
 			if (blobCids.length > 0) {
-				const uri = AtUri.make(
-					this.repo.did,
-					record.collection,
-					record.rkey,
-				).toString();
+				const uri = `at://${this.repo.did}/${record.collection}/${record.rkey}`;
 				this.storage!.addRecordBlobs(uri, blobCids);
 			}
 		}

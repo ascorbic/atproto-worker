@@ -118,9 +118,6 @@ importers:
       '@atcute/tid':
         specifier: ^1.1.1
         version: 1.1.1
-      '@atproto-labs/handle-resolver':
-        specifier: ^0.3.4
-        version: 0.3.4
       '@atproto/common-web':
         specifier: ^0.4.7
         version: 0.4.7
@@ -261,15 +258,6 @@ packages:
 
   '@atcute/util-text@0.0.1':
     resolution: {integrity: sha512-t1KZqvn0AYy+h2KcJyHnKF9aEqfRfMUmyY8j1ELtAEIgqN9CxINAjxnoRCJIFUlvWzb+oY3uElQL/Vyk3yss0g==}
-
-  '@atproto-labs/handle-resolver@0.3.4':
-    resolution: {integrity: sha512-wsNopfzfgO3uPvfnFDgNeXgDufXxSXhjBjp2WEiSzEiLrMy0Jodnqggw4OzD9MJKf0a4Iu2/ydd537qdy91LrQ==}
-
-  '@atproto-labs/simple-store-memory@0.1.4':
-    resolution: {integrity: sha512-3mKY4dP8I7yKPFj9VKpYyCRzGJOi5CEpOLPlRhoJyLmgs3J4RzDrjn323Oakjz2Aj2JzRU/AIvWRAZVhpYNJHw==}
-
-  '@atproto-labs/simple-store@0.3.0':
-    resolution: {integrity: sha512-nOb6ONKBRJHRlukW1sVawUkBqReLlLx6hT35VS3imaNPwiXDxLnTK7lxw3Lrl9k5yugSBDQAkZAq3MPTEFSUBQ==}
 
   '@atproto/api@0.18.9':
     resolution: {integrity: sha512-ft+0+sczS0qsoxwjqO1VhCXSNG792QEr+uQ91OCc36DTa3sPtaTPL7yNOVTDyEHaYDfp8tYN4v+Pq5/bzz3EpA==}
@@ -1959,9 +1947,6 @@ packages:
   loupe@3.1.4:
     resolution: {integrity: sha512-wJzkKwJrheKtknCOKNEtDK4iqg/MxmZheEMtSTYvnzRdEYaZzmgH976nenp8WdJRdx5Vc1X/9MO0Oszl6ezeXg==}
 
-  lru-cache@10.4.3:
-    resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
-
   lru-cache@11.1.0:
     resolution: {integrity: sha512-QIXZUBJUx+2zHUdQujWejBkcD9+cs94tLn0+YL8UrCh+D5sCXZ4c7LaEH48pNwRY3MLDgqUFyhlCyjJPf1WP0A==}
     engines: {node: 20 || >=22}
@@ -2830,20 +2815,6 @@ snapshots:
   '@atcute/util-text@0.0.1':
     dependencies:
       unicode-segmenter: 0.14.4
-
-  '@atproto-labs/handle-resolver@0.3.4':
-    dependencies:
-      '@atproto-labs/simple-store': 0.3.0
-      '@atproto-labs/simple-store-memory': 0.1.4
-      '@atproto/did': 0.2.3
-      zod: 3.25.76
-
-  '@atproto-labs/simple-store-memory@0.1.4':
-    dependencies:
-      '@atproto-labs/simple-store': 0.3.0
-      lru-cache: 10.4.3
-
-  '@atproto-labs/simple-store@0.3.0': {}
 
   '@atproto/api@0.18.9':
     dependencies:
@@ -4380,8 +4351,6 @@ snapshots:
   lodash.startcase@4.4.0: {}
 
   loupe@3.1.4: {}
-
-  lru-cache@10.4.3: {}
 
   lru-cache@11.1.0: {}
 

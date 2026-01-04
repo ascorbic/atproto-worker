@@ -17,7 +17,7 @@ import {
 	formatCommand,
 	type PackageManager,
 } from "../utils/cli-helpers.js";
-import { getPdsEndpoint } from "@atproto/common-web";
+import { getPdsEndpoint } from "@atcute/identity";
 
 // Helper to override clack's dim styling in notes
 const brightNote = (lines: string[]) =>

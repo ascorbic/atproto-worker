@@ -1,5 +1,19 @@
 # @getcirrus/pds
 
+## 0.3.0
+
+### Minor Changes
+
+- [#57](https://github.com/ascorbic/cirrus/pull/57) [`20ca34d`](https://github.com/ascorbic/cirrus/commit/20ca34d0170261f920ecde06a155f64688a134a4) Thanks [@ascorbic](https://github.com/ascorbic)! - Add `pds status` CLI command for comprehensive PDS health and configuration checks
+  - Enhanced `/xrpc/_health` endpoint to verify Durable Object and SQLite storage health
+  - New `pds status` command checks connectivity, repository state, identity resolution, blob import progress, federation status, and account activation
+  - Shows DID resolution method (plc.directory or well-known) and handle verification method (DNS TXT and/or HTTP well-known)
+  - Added authenticated `/xrpc/gg.mk.experimental.getFirehoseStatus` endpoint for firehose subscriber info
+
+### Patch Changes
+
+- [#58](https://github.com/ascorbic/cirrus/pull/58) [`adedb2b`](https://github.com/ascorbic/cirrus/commit/adedb2b075f3a6819b1de03996eff3c9a1c618b9) Thanks [@ascorbic](https://github.com/ascorbic)! - Respect user's package manager choice in CLI commands. All CLI commands (init, migrate, activate, deactivate) now detect and use the user's package manager consistently. Changed `wrangler deploy` references to use the appropriate package manager command (e.g., `pnpm run deploy`).
+
 ## 0.2.5
 
 ### Patch Changes

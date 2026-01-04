@@ -72,6 +72,34 @@ export function setWorkerName(name: string): void {
 }
 
 /**
+ * Set a custom domain route in wrangler config
+ * This configures Cloudflare to automatically set up DNS and SSL for the domain
+ */
+export function setCustomDomain(hostname: string): void {
+	const { configPath } = experimental_readRawConfig({});
+	if (!configPath) {
+		throw new Error("No wrangler config found");
+	}
+
+	experimental_patchConfig(configPath, {
+		routes: [
+			{
+				pattern: hostname,
+				custom_domain: true,
+			},
+		],
+	});
+}
+
+/**
+ * Get current routes from wrangler config
+ */
+export function getRoutes(): Array<{ pattern: string; custom_domain?: boolean }> {
+	const { rawConfig } = experimental_readRawConfig({});
+	return (rawConfig.routes as Array<{ pattern: string; custom_domain?: boolean }>) || [];
+}
+
+/**
  * Set a secret using wrangler secret put
  */
 export async function setSecret(

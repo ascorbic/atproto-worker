@@ -9,6 +9,7 @@ import {
 	getVars,
 	getWorkerName,
 	setWorkerName,
+	setCustomDomain,
 	type SecretName,
 } from "../utils/wrangler.js";
 import {
@@ -410,6 +411,12 @@ export const initCommand = defineCommand({
 			},
 		);
 
+		// Ask about custom domain configuration
+		const configureCustomDomain = await promptConfirm({
+			message: `Configure Cloudflare to route ${hostname} to your worker?`,
+			initialValue: true,
+		});
+
 		// Always set public vars and worker name in wrangler.jsonc
 		spinner.start("Updating wrangler.jsonc...");
 		setWorkerName(workerName);
@@ -420,6 +427,9 @@ export const initCommand = defineCommand({
 			SIGNING_KEY_PUBLIC: signingKeyPublic,
 			INITIAL_ACTIVE: initialActive,
 		});
+		if (configureCustomDomain) {
+			setCustomDomain(hostname);
+		}
 		spinner.stop("wrangler.jsonc updated");
 
 		// Set secrets
@@ -455,6 +465,10 @@ export const initCommand = defineCommand({
 				"  DID: " + did,
 				"  Handle: " + handle,
 				"  Public signing key: " + signingKeyPublic.slice(0, 20) + "...",
+				"",
+				configureCustomDomain
+					? `Custom domain: ${hostname} (Cloudflare will configure DNS)`
+					: "Custom domain: not configured (use Cloudflare dashboard)",
 				"",
 				isProduction
 					? "Secrets deployed to Cloudflare ☁️"

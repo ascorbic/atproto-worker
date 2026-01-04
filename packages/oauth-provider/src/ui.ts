@@ -6,22 +6,23 @@
 import type { ClientMetadata } from "./storage.js";
 
 /**
- * Generate Content Security Policy for the consent UI
+ * Content Security Policy for the consent UI
  *
  * - default-src 'none': Deny all by default
  * - style-src 'unsafe-inline': Allow inline styles (our CSS is inline)
  * - img-src https: data:: Allow images from HTTPS URLs (client logos) and data URIs
- * - form-action: Allow form submission to the authorization endpoint
  * - frame-ancestors 'none': Prevent clickjacking by disallowing framing
  * - base-uri 'none': Prevent base tag injection
  *
- * @param issuer The OAuth issuer URL to explicitly allow in form-action
+ * Note: form-action is intentionally omitted. Browser behavior for blocking
+ * redirects after form submission is inconsistent - Chrome blocks redirects
+ * to URLs not in form-action, while Firefox does not. Since OAuth requires
+ * redirecting to the client's callback URL after form submission, we cannot
+ * use form-action without breaking the flow in Chrome.
+ * See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/form-action
  */
-export function getConsentUICSP(issuer: string): string {
-	// Use explicit path to ensure browser compatibility - some browsers require exact path matching
-	const authorizeUrl = `${issuer}/oauth/authorize`;
-	return `default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; form-action 'self' ${authorizeUrl}; frame-ancestors 'none'; base-uri 'none'`;
-}
+export const CONSENT_UI_CSP =
+	"default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; frame-ancestors 'none'; base-uri 'none'";
 
 /**
  * Escape HTML to prevent XSS

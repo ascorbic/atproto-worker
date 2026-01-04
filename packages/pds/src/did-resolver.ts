@@ -25,6 +25,13 @@ export interface DidResolverOpts {
 // Re-export DidDocument for consumers
 export type { DidDocument };
 
+/**
+ * Wrapper that always uses globalThis.fetch so it can be mocked in tests.
+ * @atcute resolvers capture the fetch reference at construction time,
+ * so we need this indirection to allow test mocking.
+ */
+const stubbableFetch: typeof fetch = (input, init) => globalThis.fetch(input, init);
+
 export class DidResolver {
 	private resolver: CompositeDidDocumentResolver<"plc" | "web">;
 	private timeout: number;
@@ -38,8 +45,11 @@ export class DidResolver {
 			methods: {
 				plc: new PlcDidDocumentResolver({
 					apiUrl: opts.plcUrl ?? PLC_DIRECTORY,
+					fetch: stubbableFetch,
 				}),
-				web: new WebDidDocumentResolver(),
+				web: new WebDidDocumentResolver({
+					fetch: stubbableFetch,
+				}),
 			},
 		});
 	}

@@ -2,7 +2,7 @@
  * DID cache using Cloudflare Workers Cache API
  */
 
-import type { DidDocument } from "@atcute/identity";
+import { defs, type DidDocument } from "@atcute/identity";
 import { waitUntil } from "cloudflare:workers";
 
 /**
@@ -33,22 +33,6 @@ export interface DidCache {
 	): Promise<void>;
 	clearEntry(did: string): Promise<void>;
 	clear(): Promise<void>;
-}
-
-/**
- * Basic runtime check for DID document structure.
- * Documents from our resolver are already validated; this is for cached data.
- */
-function isValidDidDocument(doc: unknown): doc is DidDocument {
-	if (doc === null || typeof doc !== "object") {
-		return false;
-	}
-	const obj = doc as Record<string, unknown>;
-	return (
-		typeof obj.id === "string" &&
-		obj.id.startsWith("did:") &&
-		Array.isArray(obj["@context"])
-	);
 }
 
 const STALE_TTL = 60 * 60 * 1000; // 1 hour - serve from cache but refresh in background
@@ -95,17 +79,16 @@ export class WorkersDidCache implements DidCache {
 		const now = Date.now();
 		const age = now - cachedAt;
 
-		const doc = await response.json();
-
 		// Validate cached document schema
-		if (!isValidDidDocument(doc) || doc.id !== did) {
+		const parsed = defs.didDocument.try(await response.json());
+		if (!parsed.ok || parsed.value.id !== did) {
 			await this.clearEntry(did);
 			return null;
 		}
 
 		return {
 			did,
-			doc,
+			doc: parsed.value,
 			updatedAt: cachedAt,
 			stale: age > STALE_TTL,
 			expired: age > MAX_TTL,

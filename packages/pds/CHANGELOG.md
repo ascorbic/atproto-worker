@@ -1,5 +1,16 @@
 # @getcirrus/pds
 
+## 0.4.1
+
+### Patch Changes
+
+- [#77](https://github.com/ascorbic/cirrus/pull/77) [`2ea70ce`](https://github.com/ascorbic/cirrus/commit/2ea70ceb8a52de50787d06e38e1ddb5b31a051d2) Thanks [@ascorbic](https://github.com/ascorbic)! - Add /oauth/userinfo endpoint
+
+  Returns the user's DID (sub) and handle (preferred_username) for OpenID Connect compatibility.
+
+- Updated dependencies [[`2ea70ce`](https://github.com/ascorbic/cirrus/commit/2ea70ceb8a52de50787d06e38e1ddb5b31a051d2)]:
+  - @getcirrus/oauth-provider@0.2.0
+
 ## 0.4.0
 
 ### Minor Changes

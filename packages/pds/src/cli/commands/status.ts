@@ -234,6 +234,41 @@ export const statusCommand = defineCommand({
 			}
 		}
 
+		// Relay status - check both relays
+		if (pdsHostname) {
+			const relayStatuses = await client.getAllRelayHostStatus(pdsHostname);
+			const hasActiveRelay = relayStatuses.some((r) => r.status === "active");
+			const hasBannedRelay = relayStatuses.some((r) => r.status === "banned");
+			const needsCrawl = relayStatuses.length === 0 ||
+				relayStatuses.every((r) => r.status === "idle" || r.status === "offline");
+
+			if (relayStatuses.length === 0) {
+				console.log(`  ${WARN} No relays have crawled this PDS yet`);
+			} else {
+				for (const relayStatus of relayStatuses) {
+					const relayName = relayStatus.relay.includes("us-west") ? "us-west" : "us-east";
+					const statusIcon =
+						relayStatus.status === "active"
+							? CHECK
+							: relayStatus.status === "banned"
+								? CROSS
+								: WARN;
+					console.log(
+						`  ${statusIcon} Relay ${relayName}: ${relayStatus.status}${relayStatus.accountCount !== undefined ? ` (${relayStatus.accountCount} accounts, seq: ${relayStatus.seq ?? "none"})` : ""}`,
+					);
+				}
+			}
+
+			// Only warn if ALL relays are problematic
+			if (hasBannedRelay && !hasActiveRelay) {
+				console.log(`  ${CROSS} PDS is banned from all relays`);
+				hasErrors = true;
+			} else if (needsCrawl) {
+				console.log(pc.dim("      Run 'pds activate' or 'pds emit-identity' to request a crawl"));
+				hasWarnings = true;
+			}
+		}
+
 		// Firehose status
 		try {
 			const firehose = await client.getFirehoseStatus();

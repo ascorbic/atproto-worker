@@ -255,8 +255,7 @@ export const statusCommand = defineCommand({
 				}
 			} else {
 				console.log(`  ${WARN} Could not reach relay (not crawled yet?)`);
-				console.log(pc.dim("      Request crawl? (y/n)"));
-				// Could prompt here, but for now just inform
+				console.log(pc.dim("      Run 'pds request-crawl' to notify the relay"));
 				hasWarnings = true;
 			}
 		}

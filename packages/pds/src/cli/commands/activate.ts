@@ -13,8 +13,12 @@ import {
 	detectPackageManager,
 	formatCommand,
 } from "../utils/cli-helpers.js";
-import { resolveHandleToDid } from "../utils/handle-resolver.js";
-import { DidResolver } from "../../did-resolver.js";
+import {
+	checkHandleResolution,
+	checkDidDocument,
+	checkRepoComplete,
+	type CheckResult,
+} from "../utils/checks.js";
 
 interface Check {
 	name: string;
@@ -33,100 +37,21 @@ async function runChecks(
 	status: MigrationStatus,
 ): Promise<Check[]> {
 	const checks: Check[] = [];
-	const expectedEndpoint = pdsUrl.replace(/\/$/, "");
 
 	// Check 1: Handle resolves to correct DID
 	p.log.step("Checking handle resolution...");
-	const resolvedDid = await resolveHandleToDid(handle);
-	if (!resolvedDid) {
-		checks.push({
-			name: "Handle",
-			ok: false,
-			message: `@${handle} does not resolve to any DID`,
-			detail: "Update your DNS TXT record or .well-known/atproto-did file",
-		});
-	} else if (resolvedDid !== did) {
-		checks.push({
-			name: "Handle",
-			ok: false,
-			message: `@${handle} resolves to wrong DID`,
-			detail: `Expected: ${did}\n  Got: ${resolvedDid}`,
-		});
-	} else {
-		checks.push({
-			name: "Handle",
-			ok: true,
-			message: `@${handle} → ${did.slice(0, 24)}...`,
-		});
-	}
+	const handleResult = await checkHandleResolution(handle, did);
+	checks.push({ name: "Handle", ...handleResult });
 
 	// Check 2: DID document points to this PDS
 	p.log.step("Checking DID document...");
-	const didResolver = new DidResolver();
-	const didDoc = await didResolver.resolve(did);
-	if (!didDoc) {
-		checks.push({
-			name: "DID",
-			ok: false,
-			message: `Could not resolve DID document for ${did}`,
-			detail: "Make sure your DID is published to the PLC directory or did:web endpoint",
-		});
-	} else {
-		const pdsService = didDoc.service?.find((s) => {
-			const types = Array.isArray(s.type) ? s.type : [s.type];
-			return types.includes("AtprotoPersonalDataServer") || s.id === "#atproto_pds";
-		}) as { serviceEndpoint?: string } | undefined;
+	const didResult = await checkDidDocument(did, pdsUrl);
+	checks.push({ name: "DID", ...didResult });
 
-		if (!pdsService?.serviceEndpoint) {
-			checks.push({
-				name: "DID",
-				ok: false,
-				message: "DID document has no PDS service endpoint",
-				detail: "Update your DID document to include an AtprotoPersonalDataServer service",
-			});
-		} else {
-			const actualEndpoint = pdsService.serviceEndpoint.replace(/\/$/, "");
-			if (actualEndpoint !== expectedEndpoint) {
-				checks.push({
-					name: "DID",
-					ok: false,
-					message: "DID document points to different PDS",
-					detail: `Expected: ${expectedEndpoint}\n  Got: ${actualEndpoint}`,
-				});
-			} else {
-				checks.push({
-					name: "DID",
-					ok: true,
-					message: `PDS endpoint → ${expectedEndpoint}`,
-				});
-			}
-		}
-	}
-
-	// Check 3: Repo is complete (all blobs imported)
+	// Check 3: Repo is complete (has records and all blobs imported)
 	p.log.step("Checking repo status...");
-	const missingBlobs = status.expectedBlobs - status.importedBlobs;
-	if (missingBlobs > 0) {
-		checks.push({
-			name: "Repo",
-			ok: false,
-			message: `${missingBlobs} blob${missingBlobs === 1 ? "" : "s"} missing`,
-			detail: "Run 'pds migrate' to import missing blobs before activating",
-		});
-	} else if (!status.repoCommit) {
-		checks.push({
-			name: "Repo",
-			ok: false,
-			message: "No repo data imported",
-			detail: "Run 'pds migrate' to import your repository first",
-		});
-	} else {
-		checks.push({
-			name: "Repo",
-			ok: true,
-			message: `${status.repoBlocks} blocks, ${status.importedBlobs} blobs`,
-		});
-	}
+	const repoResult = checkRepoComplete(status);
+	checks.push({ name: "Repo", ...repoResult });
 
 	return checks;
 }

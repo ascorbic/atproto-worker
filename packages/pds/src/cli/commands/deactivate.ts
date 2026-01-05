@@ -13,8 +13,11 @@ import {
 	detectPackageManager,
 	formatCommand,
 } from "../utils/cli-helpers.js";
-import { resolveHandleToDid } from "../utils/handle-resolver.js";
-import { DidResolver } from "../../did-resolver.js";
+import {
+	checkHandleResolution,
+	checkDidDocument,
+	type CheckResult,
+} from "../utils/checks.js";
 
 // Helper to override clack's dim styling in notes
 const brightNote = (lines: string[]) => lines.map((l) => `\x1b[0m${l}`).join("\n");
@@ -36,72 +39,16 @@ async function runIdentityChecks(
 	pdsUrl: string,
 ): Promise<IdentityCheck[]> {
 	const checks: IdentityCheck[] = [];
-	const expectedEndpoint = pdsUrl.replace(/\/$/, "");
 
 	// Check 1: Handle resolution
 	p.log.step("Checking handle resolution...");
-	const resolvedDid = await resolveHandleToDid(handle);
-	if (!resolvedDid) {
-		checks.push({
-			name: "Handle resolution",
-			ok: false,
-			message: `Handle @${handle} does not resolve to any DID`,
-		});
-	} else if (resolvedDid !== did) {
-		checks.push({
-			name: "Handle resolution",
-			ok: false,
-			message: `Handle @${handle} resolves to wrong DID`,
-			detail: `Expected: ${did}\n  Got: ${resolvedDid}`,
-		});
-	} else {
-		checks.push({
-			name: "Handle resolution",
-			ok: true,
-			message: `@${handle} → ${did.slice(0, 24)}...`,
-		});
-	}
+	const handleResult = await checkHandleResolution(handle, did);
+	checks.push({ name: "Handle resolution", ...handleResult });
 
 	// Check 2: DID document
 	p.log.step("Checking DID document...");
-	const didResolver = new DidResolver();
-	const didDoc = await didResolver.resolve(did);
-	if (!didDoc) {
-		checks.push({
-			name: "DID document",
-			ok: false,
-			message: `Could not resolve DID document for ${did}`,
-		});
-	} else {
-		const pdsService = didDoc.service?.find((s) => {
-			const types = Array.isArray(s.type) ? s.type : [s.type];
-			return types.includes("AtprotoPersonalDataServer") || s.id === "#atproto_pds";
-		}) as { serviceEndpoint?: string } | undefined;
-
-		if (!pdsService?.serviceEndpoint) {
-			checks.push({
-				name: "DID document",
-				ok: false,
-				message: "DID document has no PDS service endpoint",
-			});
-		} else {
-			const actualEndpoint = pdsService.serviceEndpoint.replace(/\/$/, "");
-			if (actualEndpoint !== expectedEndpoint) {
-				checks.push({
-					name: "DID document",
-					ok: false,
-					message: "DID document points to different PDS",
-					detail: `Current: ${actualEndpoint}`,
-				});
-			} else {
-				checks.push({
-					name: "DID document",
-					ok: true,
-					message: `PDS endpoint → ${expectedEndpoint}`,
-				});
-			}
-		}
-	}
+	const didResult = await checkDidDocument(did, pdsUrl);
+	checks.push({ name: "DID document", ...didResult });
 
 	return checks;
 }

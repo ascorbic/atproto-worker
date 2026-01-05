@@ -20,5 +20,5 @@ Add pre-activation checks and emit-identity command
 - Standalone `pds emit-identity` command to notify relays to refresh handle verification
 - Useful after migration or handle changes
 
-**API changes:**
-- Moved emit identity endpoint from `/admin/emit-identity` to `/xrpc/gg.mk.experimental.emitIdentityEvent`
+**Internal changes:**
+- Moved emit identity endpoint from `/admin/emit-identity` to XRPC namespace `gg.mk.experimental.emitIdentityEvent`

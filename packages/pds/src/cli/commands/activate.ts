@@ -222,10 +222,7 @@ export const activateCommand = defineCommand({
 			p.log.info("Your account is already active.");
 
 			// Check if profile exists and offer to create one
-			const did = config.DID;
-			if (did) {
-				await promptCreateProfile(client, did as Did, handle);
-			}
+			await promptCreateProfile(client, did as Did, handle);
 
 			// Offer to ping the relay
 			const pdsHostname = config.PDS_HOSTNAME;
@@ -319,10 +316,8 @@ export const activateCommand = defineCommand({
 		}
 
 		// Check if profile exists and offer to create one
-		const did = config.DID;
-		if (did) {
-			await promptCreateProfile(client, did as Did, handle);
-		}
+		await promptCreateProfile(client, did as Did, handle);
+
 		// Verify activation worked
 		spinner.start("Verifying activation...");
 		const postStatus = await client.getAccountStatus();

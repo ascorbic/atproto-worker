@@ -234,6 +234,33 @@ export const statusCommand = defineCommand({
 			}
 		}
 
+		// Relay status
+		if (pdsHostname) {
+			const relayStatus = await client.getRelayHostStatus(pdsHostname);
+			if (relayStatus) {
+				const statusIcon =
+					relayStatus.status === "active"
+						? CHECK
+						: relayStatus.status === "banned"
+							? CROSS
+							: WARN;
+				console.log(
+					`  ${statusIcon} Relay status: ${relayStatus.status}${relayStatus.accountCount !== undefined ? ` (${relayStatus.accountCount} accounts)` : ""}`,
+				);
+				if (relayStatus.seq !== undefined) {
+					console.log(`  ${INFO} Relay seq: ${relayStatus.seq}`);
+				}
+				if (relayStatus.status === "idle" || relayStatus.status === "offline") {
+					console.log(pc.dim("      Run 'pds emit-identity' or request crawl to notify the relay"));
+				}
+			} else {
+				console.log(`  ${WARN} Could not reach relay (not crawled yet?)`);
+				console.log(pc.dim("      Request crawl? (y/n)"));
+				// Could prompt here, but for now just inform
+				hasWarnings = true;
+			}
+		}
+
 		// Firehose status
 		try {
 			const firehose = await client.getFirehoseStatus();

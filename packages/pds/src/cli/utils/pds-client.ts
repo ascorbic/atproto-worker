@@ -690,6 +690,33 @@ export class PDSClient {
 	// ============================================
 
 	/**
+	 * Get relay's view of this PDS host status.
+	 * Calls com.atproto.sync.getHostStatus on the relay.
+	 */
+	async getRelayHostStatus(
+		pdsHostname: string,
+		relayUrl: string = "https://bsky.network",
+	): Promise<{
+		status: "active" | "idle" | "offline" | "throttled" | "banned";
+		accountCount?: number;
+		seq?: number;
+	} | null> {
+		try {
+			const url = new URL("/xrpc/com.atproto.sync.getHostStatus", relayUrl);
+			url.searchParams.set("hostname", pdsHostname);
+			const res = await fetch(url.toString());
+			if (!res.ok) return null;
+			return res.json() as Promise<{
+				status: "active" | "idle" | "offline" | "throttled" | "banned";
+				accountCount?: number;
+				seq?: number;
+			}>;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
 	 * Request the relay to crawl this PDS.
 	 * This notifies the Bluesky relay that the PDS is active and ready for federation.
 	 */

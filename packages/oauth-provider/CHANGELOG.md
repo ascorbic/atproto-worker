@@ -1,5 +1,16 @@
 # @getcirrus/oauth-provider
 
+## 0.2.0
+
+### Minor Changes
+
+- [#77](https://github.com/ascorbic/cirrus/pull/77) [`2ea70ce`](https://github.com/ascorbic/cirrus/commit/2ea70ceb8a52de50787d06e38e1ddb5b31a051d2) Thanks [@ascorbic](https://github.com/ascorbic)! - Add private_key_jwt client authentication and fix response_mode default
+  - Implement RFC 7523 JWT Bearer client authentication for confidential OAuth clients
+  - Add `private_key_jwt` to `token_endpoint_auth_methods_supported` in metadata
+  - Support inline JWKS and remote JWKS URI for client public keys
+  - Fix default `response_mode` from `fragment` to `query` for authorization code flow
+  - Add `userinfo_endpoint` to OAuth server metadata
+
 ## 0.1.3
 
 ### Patch Changes

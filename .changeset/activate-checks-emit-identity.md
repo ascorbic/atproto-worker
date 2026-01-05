@@ -20,8 +20,5 @@ Add pre-activation checks and emit-identity command
 - Standalone `pds emit-identity` command to notify relays to refresh handle verification
 - Useful after migration or handle changes
 
-**New homepage:**
-- Added a simple landing page at the PDS root URL showing handle and version
-
 **API changes:**
-- Moved emit identity endpoint from `/admin/emit-identity` to `/xrpc/gg.mk.pds.emitIdentityEvent`
+- Moved emit identity endpoint from `/admin/emit-identity` to `/xrpc/gg.mk.experimental.emitIdentityEvent`

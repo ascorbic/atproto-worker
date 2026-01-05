@@ -3,6 +3,7 @@
  */
 import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
+import type { Did } from "@atcute/lexicons";
 import pc from "picocolors";
 import { getVars } from "../utils/wrangler.js";
 import { readDevVars } from "../utils/dotenv.js";
@@ -12,6 +13,7 @@ import {
 	getDomain,
 	detectPackageManager,
 	formatCommand,
+	promptText,
 } from "../utils/cli-helpers.js";
 import {
 	checkHandleResolution,
@@ -63,6 +65,68 @@ function logCheck(check: Check): void {
 	if (check.detail && !check.ok) {
 		for (const line of check.detail.split("\n")) {
 			console.log(`             ${pc.dim(line)}`);
+		}
+	}
+}
+
+/**
+ * Prompt user to create a profile if one doesn't exist
+ */
+async function promptCreateProfile(
+	client: PDSClient,
+	did: Did,
+	handle: string | undefined,
+): Promise<void> {
+	const spinner = p.spinner();
+
+	spinner.start("Checking profile...");
+	const existingProfile = await client.getProfile(did);
+	spinner.stop(existingProfile ? "Profile found" : "No profile found");
+
+	if (!existingProfile) {
+		const createProfile = await p.confirm({
+			message: "Create a profile? (recommended for visibility on the network)",
+			initialValue: true,
+		});
+
+		if (p.isCancel(createProfile)) {
+			p.cancel("Cancelled.");
+			process.exit(0);
+		}
+
+		if (createProfile) {
+			const displayName = await promptText({
+				message: "Display name:",
+				placeholder: handle || "Your Name",
+				validate: (v) => {
+					if (v && v.length > 64)
+						return "Display name must be 64 characters or less";
+					return undefined;
+				},
+			});
+
+			const description = await promptText({
+				message: "Bio (optional):",
+				placeholder: "Tell us about yourself",
+				validate: (v) => {
+					if (v && v.length > 256) return "Bio must be 256 characters or less";
+					return undefined;
+				},
+			});
+
+			spinner.start("Creating profile...");
+			try {
+				await client.putProfile(did, {
+					displayName: displayName || undefined,
+					description: description || undefined,
+				});
+				spinner.stop("Profile created!");
+			} catch (err) {
+				spinner.stop("Failed to create profile");
+				p.log.warn(
+					err instanceof Error ? err.message : "Could not create profile",
+				);
+			}
 		}
 	}
 }
@@ -138,7 +202,9 @@ export const activateCommand = defineCommand({
 			spinner.stop(`PDS not responding at ${targetDomain}`);
 			p.log.error(`Your PDS isn't responding at ${targetUrl}`);
 			if (!isDev) {
-				p.log.info(`Make sure your worker is deployed: ${formatCommand(pm, "deploy")}`);
+				p.log.info(
+					`Make sure your worker is deployed: ${formatCommand(pm, "deploy")}`,
+				);
 			}
 			p.outro("Activation cancelled.");
 			process.exit(1);
@@ -154,6 +220,9 @@ export const activateCommand = defineCommand({
 		// Check if already active
 		if (status.active) {
 			p.log.info("Your account is already active.");
+
+			// Check if profile exists and offer to create one
+			await promptCreateProfile(client, did as Did, handle);
 
 			// Offer to ping the relay
 			const pdsHostname = config.PDS_HOSTNAME;
@@ -246,6 +315,9 @@ export const activateCommand = defineCommand({
 			process.exit(1);
 		}
 
+		// Check if profile exists and offer to create one
+		await promptCreateProfile(client, did as Did, handle);
+
 		// Verify activation worked
 		spinner.start("Verifying activation...");
 		const postStatus = await client.getAccountStatus();
@@ -267,7 +339,9 @@ export const activateCommand = defineCommand({
 				spinner.stop("Relay notified");
 			} else {
 				spinner.stop("Could not notify relay");
-				p.log.warn("Run 'pds activate' again later to retry notifying the relay.");
+				p.log.warn(
+					"Run 'pds activate' again later to retry notifying the relay.",
+				);
 			}
 		}
 

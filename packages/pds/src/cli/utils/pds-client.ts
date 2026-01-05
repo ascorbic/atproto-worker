@@ -8,7 +8,12 @@ import {
 	ok,
 	type FetchHandler,
 } from "@atcute/client";
-import type { Did } from "@atcute/lexicons";
+import type { Did, Nsid, RecordKey } from "@atcute/lexicons";
+import { AppBskyActorProfile } from "@atcute/bluesky";
+import {
+	type ComAtprotoRepoGetRecord,
+	type ComAtprotoRepoPutRecord,
+} from "@atcute/atproto";
 // These imports augment @atcute/client with typed XRPC method signatures.
 // Without them, the client's .get() and .post() methods lack type information.
 import type {} from "@atcute/atproto";
@@ -614,6 +619,70 @@ export class PDSClient {
 		} catch {
 			return null;
 		}
+	}
+
+	// ============================================
+	// Record Operations
+	// ============================================
+
+	/**
+	 * Get a record from the repository
+	 */
+	async getRecord(
+		repo: Did,
+		collection: Nsid,
+		rkey: RecordKey,
+	): Promise<ComAtprotoRepoGetRecord.$output | null> {
+		try {
+			return await ok(
+				this.client.get("com.atproto.repo.getRecord", {
+					params: { repo, collection, rkey },
+				}),
+			);
+		} catch (err) {
+			if (err instanceof ClientResponseError && err.status === 404) {
+				return null;
+			}
+			throw err;
+		}
+	}
+
+	/**
+	 * Create or update a record in the repository
+	 */
+	async putRecord(
+		repo: Did,
+		collection: Nsid,
+		rkey: RecordKey,
+		record: Record<string, unknown>,
+	): Promise<ComAtprotoRepoPutRecord.$output> {
+		return ok(
+			this.client.post("com.atproto.repo.putRecord", {
+				input: { repo, collection, rkey, record },
+			}),
+		);
+	}
+
+	/**
+	 * Get the user's profile record
+	 */
+	async getProfile(did: Did): Promise<AppBskyActorProfile.Main | null> {
+		const record = await this.getRecord(did, "app.bsky.actor.profile", "self");
+		if (!record) return null;
+		return record.value as AppBskyActorProfile.Main;
+	}
+
+	/**
+	 * Create or update the user's profile
+	 */
+	async putProfile(
+		did: Did,
+		profile: Partial<Omit<AppBskyActorProfile.Main, "$type">>,
+	): Promise<ComAtprotoRepoPutRecord.$output> {
+		return this.putRecord(did, "app.bsky.actor.profile", "self", {
+			$type: "app.bsky.actor.profile",
+			...profile,
+		});
 	}
 
 	// ============================================

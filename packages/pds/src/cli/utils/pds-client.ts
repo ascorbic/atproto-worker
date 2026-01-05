@@ -744,10 +744,11 @@ export class PDSClient {
 	/**
 	 * Request the relay to crawl this PDS.
 	 * This notifies the Bluesky relay that the PDS is active and ready for federation.
+	 * Uses bsky.network by default (the main relay endpoint).
 	 */
 	async requestCrawl(
 		pdsHostname: string,
-		relayUrl: string,
+		relayUrl = "https://bsky.network",
 	): Promise<boolean> {
 		try {
 			const url = new URL("/xrpc/com.atproto.sync.requestCrawl", relayUrl);
@@ -760,15 +761,5 @@ export class PDSClient {
 		} catch {
 			return false;
 		}
-	}
-
-	/**
-	 * Request all known relays to crawl this PDS.
-	 */
-	async requestCrawlAll(pdsHostname: string): Promise<boolean> {
-		const results = await Promise.all(
-			PDSClient.RELAY_URLS.map((url) => this.requestCrawl(pdsHostname, url)),
-		);
-		return results.some((ok) => ok);
 	}
 }

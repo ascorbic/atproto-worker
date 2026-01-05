@@ -238,12 +238,12 @@ export const activateCommand = defineCommand({
 				}
 
 				if (pingRelay) {
-					spinner.start("Notifying relay...");
-					const relayPinged = await client.requestCrawl(pdsHostname);
-					if (relayPinged) {
-						spinner.stop("Relay notified");
+					spinner.start("Requesting crawl from relay...");
+					const crawlOk = await client.requestCrawl(pdsHostname);
+					if (crawlOk) {
+						spinner.stop("Crawl requested");
 					} else {
-						spinner.stop("Could not notify relay");
+						spinner.stop("Could not request crawl");
 					}
 				}
 			}
@@ -330,17 +330,17 @@ export const activateCommand = defineCommand({
 		}
 		spinner.stop("Account is active");
 
-		// Ping the relay to request crawl
+		// Request crawl from relay
 		const pdsHostname = config.PDS_HOSTNAME;
 		if (pdsHostname && !isDev) {
-			spinner.start("Notifying relay...");
-			const relayPinged = await client.requestCrawl(pdsHostname);
-			if (relayPinged) {
-				spinner.stop("Relay notified");
+			spinner.start("Requesting crawl from relay...");
+			const crawlOk = await client.requestCrawl(pdsHostname);
+			if (crawlOk) {
+				spinner.stop("Crawl requested");
 			} else {
-				spinner.stop("Could not notify relay");
+				spinner.stop("Could not request crawl");
 				p.log.warn(
-					"Run 'pds activate' again later to retry notifying the relay.",
+					"Run 'pds activate' again later to retry requesting a crawl.",
 				);
 			}
 		}

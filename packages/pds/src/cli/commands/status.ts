@@ -264,14 +264,8 @@ export const statusCommand = defineCommand({
 				console.log(`  ${CROSS} PDS is banned from all relays`);
 				hasErrors = true;
 			} else if (needsCrawl) {
-				console.log(pc.dim("      Requesting crawl from all relays..."));
-				const crawlOk = await client.requestCrawlAll(pdsHostname);
-				if (crawlOk) {
-					console.log(`  ${CHECK} Crawl requested`);
-				} else {
-					console.log(`  ${WARN} Failed to request crawl`);
-					hasWarnings = true;
-				}
+				console.log(pc.dim("      Run 'pds activate' or 'pds emit-identity' to request a crawl"));
+				hasWarnings = true;
 			}
 		}
 

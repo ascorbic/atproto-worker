@@ -85,6 +85,19 @@ export const emitIdentityCommand = defineCommand({
 			process.exit(1);
 		}
 
+		// Request crawl from relay
+		const pdsHostname = config.PDS_HOSTNAME;
+		if (pdsHostname && !isDev) {
+			spinner.start("Requesting crawl from relay...");
+			const crawlOk = await client.requestCrawl(pdsHostname);
+			if (crawlOk) {
+				spinner.stop("Crawl requested");
+			} else {
+				spinner.stop("Could not request crawl");
+				p.log.warn("The relay may not pick up the identity change immediately.");
+			}
+		}
+
 		p.log.success("Relays have been notified to refresh your handle verification.");
 		p.outro("Done!");
 	},

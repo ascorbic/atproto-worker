@@ -1,5 +1,16 @@
 # @getcirrus/pds
 
+## 0.5.0
+
+### Minor Changes
+
+- [#81](https://github.com/ascorbic/cirrus/pull/81) [`688d141`](https://github.com/ascorbic/cirrus/commit/688d1414bd7dc3e4ea1f731ce22f7271f96b2f2a) Thanks [@ascorbic](https://github.com/ascorbic)! - Raise blob size limit from 5MB to 60MB
+
+### Patch Changes
+
+- Updated dependencies [[`e5507d1`](https://github.com/ascorbic/cirrus/commit/e5507d1ced8ed70e2981b737978d97967e4e8cd8)]:
+  - @getcirrus/oauth-provider@0.2.1
+
 ## 0.4.1
 
 ### Patch Changes

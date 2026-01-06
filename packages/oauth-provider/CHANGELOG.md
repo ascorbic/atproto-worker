@@ -1,5 +1,13 @@
 # @getcirrus/oauth-provider
 
+## 0.2.1
+
+### Patch Changes
+
+- [#82](https://github.com/ascorbic/cirrus/pull/82) [`e5507d1`](https://github.com/ascorbic/cirrus/commit/e5507d1ced8ed70e2981b737978d97967e4e8cd8) Thanks [@ascorbic](https://github.com/ascorbic)! - Fix support for confidential OAuth clients with remote JWKS (like leaflet.pub):
+  - Accept issuer URL as valid JWT audience (not just token endpoint)
+  - Invalidate stale cache entries missing tokenEndpointAuthMethod
+
 ## 0.2.0
 
 ### Minor Changes

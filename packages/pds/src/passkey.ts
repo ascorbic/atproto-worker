@@ -15,39 +15,14 @@ import {
 	generateAuthenticationOptions,
 	verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
+import type {
+	AuthenticationResponseJSON,
+	RegistrationResponseJSON,
+} from "@simplewebauthn/server";
 import type { AccountDurableObject } from "./account-do";
 
-// Type definitions for WebAuthn JSON formats
-// These match the @simplewebauthn types but are declared locally to avoid import path issues
-
-/** Registration response from the browser's WebAuthn API */
-interface RegistrationResponseJSON {
-	id: string;
-	rawId: string;
-	response: {
-		clientDataJSON: string;
-		attestationObject: string;
-		transports?: string[];
-	};
-	type: string;
-	clientExtensionResults?: Record<string, unknown>;
-	authenticatorAttachment?: string;
-}
-
-/** Authentication response from the browser's WebAuthn API */
-interface AuthenticationResponseJSON {
-	id: string;
-	rawId: string;
-	response: {
-		clientDataJSON: string;
-		authenticatorData: string;
-		signature: string;
-		userHandle?: string;
-	};
-	type: string;
-	clientExtensionResults?: Record<string, unknown>;
-	authenticatorAttachment?: string;
-}
+// Re-export for use by other modules (e.g., oauth.ts)
+export type { AuthenticationResponseJSON, RegistrationResponseJSON };
 
 /** Options for creating a new credential */
 export interface PublicKeyCredentialCreationOptionsJSON {

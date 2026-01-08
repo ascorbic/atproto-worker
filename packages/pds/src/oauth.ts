@@ -22,6 +22,7 @@ import type { AccountDurableObject } from "./account-do";
 import {
 	getAuthenticationOptions,
 	verifyPasskeyAuthentication,
+	type AuthenticationResponseJSON,
 } from "./passkey";
 
 /**
@@ -127,7 +128,7 @@ export function getProvider(env: PDSEnv): ATProtoOAuthProvider {
 			const result = await verifyPasskeyAuthentication(
 				accountDO,
 				env.PDS_HOSTNAME,
-				response as Parameters<typeof verifyPasskeyAuthentication>[2],
+				response as AuthenticationResponseJSON,
 				challenge,
 			);
 			if (!result.success) return null;

@@ -115,9 +115,9 @@ export function getProvider(env: PDSEnv): ATProtoOAuthProvider {
 			};
 		},
 		// Passkey authentication options
-		getPasskeyOptions: async () => {
+		getPasskeyOptions: async (): Promise<Record<string, unknown> | null> => {
 			const options = await getAuthenticationOptions(accountDO, env.PDS_HOSTNAME);
-			return options;
+			return options as Record<string, unknown> | null;
 		},
 		// Passkey verification
 		verifyPasskey: async (response, challenge: string) => {

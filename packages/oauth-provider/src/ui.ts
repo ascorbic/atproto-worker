@@ -117,7 +117,7 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 			<div class="login-form">
 				<p>Sign in to continue</p>
 				${passkeyAvailable ? `
-				<button type="button" class="btn-passkey" id="passkey-btn" onclick="authenticateWithPasskey()">
+				<button type="button" class="btn-passkey" id="passkey-btn">
 					<span class="passkey-icon">🔐</span>
 					Sign in with Passkey
 				</button>
@@ -546,6 +546,8 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 				btn.innerHTML = '<span class="passkey-icon">🔐</span> Sign in with Passkey';
 			}
 		}
+
+		document.getElementById('passkey-btn').addEventListener('click', authenticateWithPasskey);
 	</script>
 	` : ""}
 </body>

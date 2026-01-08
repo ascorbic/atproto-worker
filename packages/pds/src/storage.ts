@@ -98,14 +98,6 @@ export class SqliteRepoStorage
 				name TEXT
 			);
 		`);
-
-		// Migration: add name column to passkey_tokens if it doesn't exist
-		// (for databases created before this column was added)
-		try {
-			this.sql.exec(`ALTER TABLE passkey_tokens ADD COLUMN name TEXT`);
-		} catch {
-			// Column already exists, ignore
-		}
 	}
 
 	/**

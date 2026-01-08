@@ -191,7 +191,7 @@ export function renderPasskeyRegistrationPage(opts: PasskeyUIOptions): string {
 			<p>Click the button below to create a passkey for this device.</p>
 		</div>
 
-		<button class="btn" id="register-btn" onclick="registerPasskey()">
+		<button class="btn" id="register-btn">
 			Register Passkey
 		</button>
 
@@ -325,6 +325,8 @@ export function renderPasskeyRegistrationPage(opts: PasskeyUIOptions): string {
 			document.getElementById('status').textContent = 'WebAuthn is not supported in this browser.';
 			document.getElementById('status').className = 'status error';
 			document.getElementById('register-btn').disabled = true;
+		} else {
+			document.getElementById('register-btn').addEventListener('click', registerPasskey);
 		}
 	</script>
 </body>

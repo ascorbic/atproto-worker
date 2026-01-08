@@ -37,6 +37,17 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * Safely embed JSON in a <script> tag to prevent XSS.
+ * Escapes characters that could break out of the script context.
+ */
+function safeJsonEmbed(obj: unknown): string {
+	return JSON.stringify(obj)
+		.replace(/</g, "\\u003c")
+		.replace(/>/g, "\\u003e")
+		.replace(/&/g, "\\u0026");
+}
+
+/**
  * Parse scope string into human-readable descriptions
  */
 function getScopeDescriptions(scope: string): string[] {
@@ -90,8 +101,8 @@ export interface ConsentUIOptions {
 	error?: string;
 	/** Whether passkey login is available */
 	passkeyAvailable?: boolean;
-	/** WebAuthn authentication options for passkey login (JSON stringified) */
-	passkeyOptions?: string;
+	/** WebAuthn authentication options for passkey login */
+	passkeyOptions?: Record<string, unknown>;
 }
 
 /**
@@ -435,8 +446,8 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 	</div>
 	${passkeyAvailable && passkeyOptions ? `
 	<script>
-		const passkeyOptions = ${passkeyOptions};
-		const oauthParams = ${JSON.stringify(oauthParams)};
+		const passkeyOptions = ${safeJsonEmbed(passkeyOptions)};
+		const oauthParams = ${safeJsonEmbed(oauthParams)};
 
 		// Convert base64url to ArrayBuffer
 		function base64urlToBuffer(base64url) {

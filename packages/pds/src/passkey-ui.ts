@@ -25,6 +25,31 @@ function escapeHtml(text: string): string {
 		.replace(/'/g, "&#039;");
 }
 
+/**
+ * Safely embed JSON in a <script> tag to prevent XSS.
+ * Escapes characters that could break out of the script context.
+ */
+function safeJsonEmbed(obj: unknown): string {
+	return JSON.stringify(obj)
+		.replace(/</g, "\\u003c")
+		.replace(/>/g, "\\u003e")
+		.replace(/&/g, "\\u0026");
+}
+
+/**
+ * Escape a string for safe embedding in a JavaScript string literal.
+ */
+function escapeJsString(str: string): string {
+	return str
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"')
+		.replace(/'/g, "\\'")
+		.replace(/\n/g, "\\n")
+		.replace(/\r/g, "\\r")
+		.replace(/</g, "\\u003c")
+		.replace(/>/g, "\\u003e");
+}
+
 export interface PasskeyUIOptions {
 	/** WebAuthn registration options */
 	options: PublicKeyCredentialCreationOptionsJSON;
@@ -40,8 +65,8 @@ export interface PasskeyUIOptions {
 export function renderPasskeyRegistrationPage(opts: PasskeyUIOptions): string {
 	const { options, token, handle } = opts;
 
-	// Serialize options for the client-side script
-	const optionsJson = JSON.stringify(options);
+	// Serialize options for the client-side script (with XSS protection)
+	const optionsJson = safeJsonEmbed(options);
 
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -213,7 +238,7 @@ export function renderPasskeyRegistrationPage(opts: PasskeyUIOptions): string {
 
 	<script>
 		const options = ${optionsJson};
-		const token = "${escapeHtml(token)}";
+		const token = "${escapeJsString(token)}";
 
 		// Convert base64url challenge to ArrayBuffer
 		function base64urlToBuffer(base64url) {

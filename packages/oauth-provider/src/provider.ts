@@ -249,7 +249,7 @@ export class ATProtoOAuthProvider {
 			userHandle: user?.handle,
 			showLogin: !user && !!this.verifyUser,
 			passkeyAvailable: !user && !!passkeyOptions,
-			passkeyOptions: passkeyOptions ? JSON.stringify(passkeyOptions) : undefined,
+			passkeyOptions: passkeyOptions ?? undefined,
 		});
 
 		return new Response(html, {

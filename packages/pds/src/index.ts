@@ -355,13 +355,19 @@ app.get(
 app.post("/passkey/init", requireAuth, async (c) => {
 	const accountDO = getAccountDO(c.env);
 	const body = await c.req.json<{ name?: string }>().catch(() => ({} as { name?: string }));
-	const result = await passkey.initPasskeyRegistration(
-		accountDO,
-		c.env.PDS_HOSTNAME,
-		c.env.DID,
-		body.name,
-	);
-	return c.json(result);
+	try {
+		const result = await passkey.initPasskeyRegistration(
+			accountDO,
+			c.env.PDS_HOSTNAME,
+			c.env.DID,
+			body.name,
+		);
+		return c.json(result);
+	} catch (err) {
+		console.error("Passkey init error:", err);
+		const message = err instanceof Error ? err.message : String(err);
+		return c.json({ error: "PasskeyInitFailed", message }, 500);
+	}
 });
 
 // Passkey registration page (GET - renders UI)
@@ -407,7 +413,6 @@ app.post("/passkey/register", async (c) => {
 	const body = await c.req.json<{
 		token: string;
 		response: any;
-		name?: string;
 	}>();
 
 	if (!body.token || !body.response) {
@@ -415,12 +420,12 @@ app.post("/passkey/register", async (c) => {
 	}
 
 	const accountDO = getAccountDO(c.env);
+	// Name comes from the token (set during init)
 	const result = await passkey.completePasskeyRegistration(
 		accountDO,
 		c.env.PDS_HOSTNAME,
 		body.token,
 		body.response,
-		body.name,
 	);
 
 	if (result.success) {

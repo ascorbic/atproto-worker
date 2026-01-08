@@ -174,8 +174,8 @@ export async function initPasskeyRegistration(
 		attestationType: "none",
 	});
 
-	// Store the challenge with the token
-	await accountDO.rpcSavePasskeyToken(token, options.challenge, expiresAt);
+	// Store the challenge with the token (and name for later)
+	await accountDO.rpcSavePasskeyToken(token, options.challenge, expiresAt, name);
 
 	const url = `https://${pdsHostname}/passkey/register?token=${token}`;
 
@@ -211,6 +211,7 @@ export async function getRegistrationOptions(
 		token,
 		storage.challenge,
 		Date.now() + TOKEN_TTL_MS,
+		storage.name ?? undefined,
 	);
 
 	// Get existing passkeys to exclude them
@@ -243,15 +244,15 @@ export async function getRegistrationOptions(
  * Complete passkey registration
  *
  * Verifies the registration response and stores the new passkey.
+ * The name comes from the token (set during initPasskeyRegistration).
  */
 export async function completePasskeyRegistration(
 	accountDO: DurableObjectStub<AccountDurableObject>,
 	pdsHostname: string,
 	token: string,
 	response: RegistrationResponseJSON,
-	name?: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
-	// Consume the token to get the challenge
+	// Consume the token to get the challenge and name
 	const tokenData = await accountDO.rpcConsumePasskeyToken(token);
 	if (!tokenData) {
 		return { success: false, error: "Invalid or expired token" };
@@ -272,12 +273,12 @@ export async function completePasskeyRegistration(
 
 		const { credential } = verification.registrationInfo;
 
-		// Store the passkey
+		// Store the passkey (name comes from the token)
 		await accountDO.rpcSavePasskey(
 			credential.id,
 			credential.publicKey,
 			credential.counter,
-			name,
+			tokenData.name ?? undefined,
 		);
 
 		return { success: true };

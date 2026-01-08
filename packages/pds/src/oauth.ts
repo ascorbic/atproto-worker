@@ -14,10 +14,15 @@ import type {
 	TokenData,
 	ClientMetadata,
 	PARData,
+	PasskeyAuthResponse,
 } from "@getcirrus/oauth-provider";
 import { compare } from "bcryptjs";
 import type { PDSEnv } from "./types";
 import type { AccountDurableObject } from "./account-do";
+import {
+	getAuthenticationOptions,
+	verifyPasskeyAuthentication,
+} from "./passkey";
 
 /**
  * Proxy storage class that delegates to DO RPC methods
@@ -109,6 +114,28 @@ export function getProvider(env: PDSEnv): ATProtoOAuthProvider {
 				handle: env.HANDLE,
 			};
 		},
+		// Passkey authentication options
+		getPasskeyOptions: async () => {
+			const options = await getAuthenticationOptions(accountDO, env.PDS_HOSTNAME);
+			return options;
+		},
+		// Passkey verification
+		verifyPasskey: async (
+			response: PasskeyAuthResponse,
+			challenge: string,
+		) => {
+			const result = await verifyPasskeyAuthentication(
+				accountDO,
+				env.PDS_HOSTNAME,
+				response as Parameters<typeof verifyPasskeyAuthentication>[2],
+				challenge,
+			);
+			if (!result.success) return null;
+			return {
+				sub: env.DID,
+				handle: env.HANDLE,
+			};
+		},
 	});
 }
 
@@ -164,6 +191,12 @@ export function createOAuthApp(
 	oauth.post("/oauth/authorize", async (c) => {
 		const provider = getProvider(c.env);
 		return provider.handleAuthorize(c.req.raw);
+	});
+
+	// Passkey authentication endpoint
+	oauth.post("/oauth/passkey-auth", async (c) => {
+		const provider = getProvider(c.env);
+		return provider.handlePasskeyAuth(c.req.raw);
 	});
 
 	// Token endpoint

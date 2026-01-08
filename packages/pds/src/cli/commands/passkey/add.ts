@@ -97,11 +97,21 @@ export const addCommand = defineCommand({
 		try {
 			registration = await client.initPasskeyRegistration(passkeyName);
 			spinner.stop("Registration link ready");
-		} catch (err) {
+		} catch (err: unknown) {
 			spinner.stop("Failed to generate registration link");
-			p.log.error(
-				err instanceof Error ? err.message : "Could not generate registration link",
-			);
+			// Extract detailed error message
+			let errorMessage = "Could not generate registration link";
+			if (err instanceof Error) {
+				errorMessage = err.message;
+			}
+			// Check for ClientResponseError with data.message
+			const errObj = err as { data?: { message?: string; error?: string } };
+			if (errObj?.data?.message) {
+				errorMessage = errObj.data.message;
+			} else if (errObj?.data?.error) {
+				errorMessage = errObj.data.error;
+			}
+			p.log.error(errorMessage);
 			p.outro("Cancelled.");
 			process.exit(1);
 		}
@@ -126,9 +136,10 @@ export const addCommand = defineCommand({
 		p.log.info("");
 
 		// Wait for user to complete registration
-		const done = await p.confirm({
-			message: "Have you completed the registration on your device?",
-			initialValue: false,
+		const done = await p.text({
+			message: "Press Enter when you've completed registration on your device",
+			placeholder: "(or Ctrl+C to cancel)",
+			defaultValue: "",
 		});
 
 		if (p.isCancel(done)) {
@@ -136,27 +147,28 @@ export const addCommand = defineCommand({
 			process.exit(0);
 		}
 
-		if (done) {
-			// Verify by listing passkeys
-			spinner.start("Verifying registration...");
-			try {
-				const result = await client.listPasskeys();
-				const found = result.passkeys.some((pk) =>
-					pk.name === passkeyName || (!passkeyName && pk.createdAt > new Date(Date.now() - 60000).toISOString())
-				);
-				if (found) {
-					spinner.stop("Passkey registered successfully!");
-					p.log.success("Your passkey is ready to use.");
-				} else {
-					spinner.stop("Registration not detected");
-					p.log.warn("Could not verify registration. Check 'pds passkey list' to see your passkeys.");
-				}
-			} catch {
-				spinner.stop("Could not verify registration");
-				p.log.warn("Check 'pds passkey list' to see your passkeys.");
+		// Verify by listing passkeys
+		spinner.start("Verifying registration...");
+		try {
+			const result = await client.listPasskeys();
+			// Check for any passkey created in the last 2 minutes
+			// SQLite stores datetime as "YYYY-MM-DD HH:MM:SS" (UTC), so parse it properly
+			const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+			const found = result.passkeys.some((pk) => {
+				// Handle both SQLite format and ISO format
+				const createdTime = new Date(pk.createdAt.replace(" ", "T") + "Z").getTime();
+				return createdTime > twoMinutesAgo;
+			});
+			if (found) {
+				spinner.stop("Passkey registered successfully!");
+				p.log.success("Your passkey is ready to use.");
+			} else {
+				spinner.stop("Registration not detected");
+				p.log.warn("Could not verify registration. Check 'pds passkey list' to see your passkeys.");
 			}
-		} else {
-			p.log.info("You can register later using the URL above (if it hasn't expired).");
+		} catch {
+			spinner.stop("Could not verify registration");
+			p.log.warn("Check 'pds passkey list' to see your passkeys.");
 		}
 
 		p.outro("Done!");

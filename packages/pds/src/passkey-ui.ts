@@ -11,7 +11,7 @@ import type { PublicKeyCredentialCreationOptionsJSON } from "./passkey";
  * Content Security Policy for the passkey UI
  */
 export const PASSKEY_UI_CSP =
-	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
+	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'";
 
 /**
  * Escape HTML to prevent XSS

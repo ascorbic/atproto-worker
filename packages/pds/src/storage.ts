@@ -94,9 +94,18 @@ export class SqliteRepoStorage
 			CREATE TABLE IF NOT EXISTS passkey_tokens (
 				token TEXT PRIMARY KEY,
 				challenge TEXT NOT NULL,
-				expires_at INTEGER NOT NULL
+				expires_at INTEGER NOT NULL,
+				name TEXT
 			);
 		`);
+
+		// Migration: add name column to passkey_tokens if it doesn't exist
+		// (for databases created before this column was added)
+		try {
+			this.sql.exec(`ALTER TABLE passkey_tokens ADD COLUMN name TEXT`);
+		} catch {
+			// Column already exists, ignore
+		}
 	}
 
 	/**
@@ -571,24 +580,25 @@ export class SqliteRepoStorage
 	// ============================================
 
 	/**
-	 * Save a registration token with challenge.
+	 * Save a registration token with challenge and optional name.
 	 */
-	savePasskeyToken(token: string, challenge: string, expiresAt: number): void {
+	savePasskeyToken(token: string, challenge: string, expiresAt: number, name?: string): void {
 		this.sql.exec(
-			`INSERT INTO passkey_tokens (token, challenge, expires_at) VALUES (?, ?, ?)`,
+			`INSERT INTO passkey_tokens (token, challenge, expires_at, name) VALUES (?, ?, ?, ?)`,
 			token,
 			challenge,
 			expiresAt,
+			name ?? null,
 		);
 	}
 
 	/**
 	 * Get and consume a registration token.
 	 */
-	consumePasskeyToken(token: string): { challenge: string } | null {
+	consumePasskeyToken(token: string): { challenge: string; name: string | null } | null {
 		const rows = this.sql
 			.exec(
-				`SELECT challenge, expires_at FROM passkey_tokens WHERE token = ?`,
+				`SELECT challenge, expires_at, name FROM passkey_tokens WHERE token = ?`,
 				token,
 			)
 			.toArray();
@@ -604,7 +614,7 @@ export class SqliteRepoStorage
 		// Check if expired
 		if (Date.now() > expiresAt) return null;
 
-		return { challenge: row.challenge as string };
+		return { challenge: row.challenge as string, name: (row.name as string) ?? null };
 	}
 
 	/**

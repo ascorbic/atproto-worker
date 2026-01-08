@@ -1399,15 +1399,16 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		token: string,
 		challenge: string,
 		expiresAt: number,
+		name?: string,
 	): Promise<void> {
 		const storage = await this.getStorage();
-		storage.savePasskeyToken(token, challenge, expiresAt);
+		storage.savePasskeyToken(token, challenge, expiresAt, name);
 	}
 
 	/** Consume a registration token */
 	async rpcConsumePasskeyToken(
 		token: string,
-	): Promise<{ challenge: string } | null> {
+	): Promise<{ challenge: string; name: string | null } | null> {
 		const storage = await this.getStorage();
 		return storage.consumePasskeyToken(token);
 	}

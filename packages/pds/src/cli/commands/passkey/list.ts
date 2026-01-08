@@ -9,6 +9,19 @@ import { readDevVars } from "../../utils/dotenv.js";
 import { PDSClient } from "../../utils/pds-client.js";
 import { getTargetUrl, getDomain } from "../../utils/cli-helpers.js";
 
+/**
+ * Format a date as yyyy-mm-dd hh:mm
+ */
+function formatDateTime(isoString: string): string {
+	const d = new Date(isoString);
+	const year = d.getFullYear();
+	const month = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	const hours = String(d.getHours()).padStart(2, "0");
+	const minutes = String(d.getMinutes()).padStart(2, "0");
+	return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
 export const listCommand = defineCommand({
 	meta: {
 		name: "list",
@@ -94,9 +107,9 @@ export const listCommand = defineCommand({
 
 			for (const pk of result.passkeys) {
 				const name = pk.name || pc.dim("(unnamed)");
-				const created = new Date(pk.createdAt).toLocaleDateString();
+				const created = formatDateTime(pk.createdAt);
 				const lastUsed = pk.lastUsedAt
-					? new Date(pk.lastUsedAt).toLocaleDateString()
+					? formatDateTime(pk.lastUsedAt)
 					: pc.dim("never");
 				const idPreview = pk.id.slice(0, 16) + "...";
 

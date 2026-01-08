@@ -6,6 +6,7 @@
 import { defineCommand } from "citty";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import QRCode from "qrcode";
 import { getVars } from "../../utils/wrangler.js";
 import { readDevVars } from "../../utils/dotenv.js";
 import { PDSClient } from "../../utils/pds-client.js";
@@ -105,12 +106,20 @@ export const addCommand = defineCommand({
 			process.exit(1);
 		}
 
-		// Display the URL
+		// Display the URL and QR code
 		const expiresIn = Math.round((registration.expiresAt - Date.now()) / 1000 / 60);
 
 		p.log.info("");
-		p.log.info(pc.bold("Open this URL on the device where you want to add a passkey:"));
+		p.log.info(pc.bold("Scan this QR code on your phone, or open the URL:"));
 		p.log.info("");
+
+		// Generate QR code for terminal
+		const qrString = await QRCode.toString(registration.url, {
+			type: "terminal",
+			small: true,
+		});
+		console.log(qrString);
+
 		p.log.info(`  ${pc.cyan(registration.url)}`);
 		p.log.info("");
 		p.log.info(pc.dim(`This link expires in ${expiresIn} minutes.`));

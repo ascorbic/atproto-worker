@@ -275,7 +275,7 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 				</button>
 				<div class="or-divider"><span>or</span></div>
 				` : ""}
-				<input type="password" name="password" placeholder="Password" autocomplete="current-password" />
+				<input type="password" name="password" placeholder="Password" autocomplete="current-password" required />
 			</div>
 		`
 		: "";

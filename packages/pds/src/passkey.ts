@@ -74,30 +74,6 @@ function generateToken(): string {
 		.replace(/=/g, "");
 }
 
-/**
- * Convert base64url to Uint8Array
- */
-function base64urlToBytes(base64url: string): Uint8Array {
-	const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
-	const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-	const binary = atob(base64 + padding);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) {
-		bytes[i] = binary.charCodeAt(i);
-	}
-	return bytes;
-}
-
-/**
- * Convert Uint8Array to base64url string
- */
-function bytesToBase64url(bytes: Uint8Array): string {
-	return btoa(String.fromCharCode(...bytes))
-		.replace(/\+/g, "-")
-		.replace(/\//g, "_")
-		.replace(/=/g, "");
-}
-
 export interface PasskeyRegistrationInit {
 	/** Token to include in the registration URL */
 	token: string;

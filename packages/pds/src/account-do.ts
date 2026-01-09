@@ -119,8 +119,8 @@ export class AccountDurableObject extends DurableObject<PDSEnv> {
 		// Run cleanup
 		this.runCleanup();
 
-		// Schedule next cleanup in 1 hour
-		await this.ctx.storage.setAlarm(Date.now() + 3600000);
+		// Schedule next cleanup in 24 hours
+		await this.ctx.storage.setAlarm(Date.now() + 86400000);
 	}
 
 	/**

@@ -18,6 +18,11 @@ import type {
 import { compare } from "bcryptjs";
 import type { PDSEnv } from "./types";
 import type { AccountDurableObject } from "./account-do";
+import {
+	getAuthenticationOptions,
+	verifyPasskeyAuthentication,
+	type AuthenticationResponseJSON,
+} from "./passkey";
 
 /**
  * Proxy storage class that delegates to DO RPC methods
@@ -109,6 +114,25 @@ export function getProvider(env: PDSEnv): ATProtoOAuthProvider {
 				handle: env.HANDLE,
 			};
 		},
+		// Passkey authentication options
+		getPasskeyOptions: async (): Promise<Record<string, unknown> | null> => {
+			const options = await getAuthenticationOptions(accountDO, env.PDS_HOSTNAME);
+			return options as Record<string, unknown> | null;
+		},
+		// Passkey verification
+		verifyPasskey: async (response, challenge: string) => {
+			const result = await verifyPasskeyAuthentication(
+				accountDO,
+				env.PDS_HOSTNAME,
+				response as AuthenticationResponseJSON,
+				challenge,
+			);
+			if (!result.success) return null;
+			return {
+				sub: env.DID,
+				handle: env.HANDLE,
+			};
+		},
 	});
 }
 
@@ -164,6 +188,12 @@ export function createOAuthApp(
 	oauth.post("/oauth/authorize", async (c) => {
 		const provider = getProvider(c.env);
 		return provider.handleAuthorize(c.req.raw);
+	});
+
+	// Passkey authentication endpoint
+	oauth.post("/oauth/passkey-auth", async (c) => {
+		const provider = getProvider(c.env);
+		return provider.handlePasskeyAuth(c.req.raw);
 	});
 
 	// Token endpoint

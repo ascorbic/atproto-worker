@@ -6,6 +6,156 @@
 import type { ClientMetadata } from "./storage.js";
 
 /**
+ * The passkey authentication script (static, can be hashed).
+ * Dynamic data is passed via data attributes on the script element.
+ */
+const PASSKEY_AUTH_SCRIPT = `
+// Get dynamic data from script element
+const scriptEl = document.currentScript;
+const passkeyOptions = JSON.parse(scriptEl.dataset.passkeyOptions);
+const oauthParams = JSON.parse(scriptEl.dataset.oauthParams);
+
+// Convert base64url to ArrayBuffer
+function base64urlToBuffer(base64url) {
+	const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+	const padding = '='.repeat((4 - base64.length % 4) % 4);
+	const binary = atob(base64 + padding);
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) {
+		bytes[i] = binary.charCodeAt(i);
+	}
+	return bytes.buffer;
+}
+
+// Convert ArrayBuffer to base64url
+function bufferToBase64url(buffer) {
+	const bytes = new Uint8Array(buffer);
+	let binary = '';
+	for (let i = 0; i < bytes.length; i++) {
+		binary += String.fromCharCode(bytes[i]);
+	}
+	return btoa(binary)
+		.replace(/\\+/g, '-')
+		.replace(/\\//g, '_')
+		.replace(/=/g, '');
+}
+
+async function authenticateWithPasskey() {
+	const btn = document.getElementById('passkey-btn');
+	const statusEl = document.querySelector('.passkey-status') || (() => {
+		const el = document.createElement('div');
+		el.className = 'passkey-status';
+		btn.parentNode.insertBefore(el, btn.nextSibling);
+		return el;
+	})();
+
+	btn.disabled = true;
+	btn.innerHTML = '<span class="passkey-icon">🔐</span> Authenticating...';
+	statusEl.textContent = '';
+	statusEl.className = 'passkey-status';
+
+	try {
+		// Convert options for WebAuthn API
+		const publicKeyOptions = {
+			challenge: base64urlToBuffer(passkeyOptions.challenge),
+			timeout: passkeyOptions.timeout,
+			rpId: passkeyOptions.rpId,
+			userVerification: passkeyOptions.userVerification,
+			allowCredentials: (passkeyOptions.allowCredentials || []).map(cred => ({
+				id: base64urlToBuffer(cred.id),
+				type: cred.type,
+				transports: cred.transports,
+			})),
+		};
+
+		// Perform WebAuthn ceremony
+		// mediation: "optional" ensures modal UI appears for cross-device auth
+		const credential = await navigator.credentials.get({
+			publicKey: publicKeyOptions,
+			mediation: "optional"
+		});
+
+		if (!credential) {
+			throw new Error('No credential returned');
+		}
+
+		// Prepare response for server
+		const response = {
+			id: credential.id,
+			rawId: bufferToBase64url(credential.rawId),
+			response: {
+				clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+				authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+				signature: bufferToBase64url(credential.response.signature),
+				userHandle: credential.response.userHandle ? bufferToBase64url(credential.response.userHandle) : undefined,
+			},
+			type: credential.type,
+			clientExtensionResults: credential.getClientExtensionResults(),
+			authenticatorAttachment: credential.authenticatorAttachment,
+		};
+
+		// Submit to server
+		const result = await fetch('/oauth/passkey-auth', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				response,
+				challenge: passkeyOptions.challenge,
+				oauthParams,
+			}),
+		});
+
+		const data = await result.json();
+
+		if (data.redirectUrl) {
+			// Success - redirect to complete authorization
+			window.location.href = data.redirectUrl;
+		} else {
+			throw new Error(data.error || 'Authentication failed');
+		}
+	} catch (err) {
+		console.error('Passkey auth error:', err);
+		statusEl.textContent = err.name === 'NotAllowedError' ? 'Authentication cancelled' : (err.message || 'Authentication failed');
+		statusEl.className = 'passkey-status error';
+		btn.disabled = false;
+		btn.innerHTML = '<span class="passkey-icon">🔐</span> Sign in with Passkey';
+	}
+}
+
+const passkeyBtn = document.getElementById('passkey-btn');
+if (passkeyBtn) {
+	passkeyBtn.addEventListener('click', authenticateWithPasskey);
+}
+`;
+
+/**
+ * Compute SHA-256 hash for CSP script-src
+ */
+async function computeScriptHash(script: string): Promise<string> {
+	const encoder = new TextEncoder();
+	const data = encoder.encode(script);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	const base64Hash = btoa(String.fromCharCode(...hashArray));
+	return `'sha256-${base64Hash}'`;
+}
+
+// Pre-computed hash (computed at module load, will be a Promise)
+let passkeyAuthScriptHashPromise: Promise<string> | null = null;
+
+/**
+ * Get the script hash for the passkey auth script
+ */
+export async function getPasskeyAuthScriptHash(): Promise<string> {
+	if (!passkeyAuthScriptHashPromise) {
+		passkeyAuthScriptHashPromise = computeScriptHash(PASSKEY_AUTH_SCRIPT);
+	}
+	return passkeyAuthScriptHashPromise;
+}
+
+/**
  * Content Security Policy for the consent UI
  *
  * - default-src 'none': Deny all by default
@@ -21,8 +171,12 @@ import type { ClientMetadata } from "./storage.js";
  * use form-action without breaking the flow in Chrome.
  * See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/form-action
  */
-export const CONSENT_UI_CSP =
-	"default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; frame-ancestors 'none'; base-uri 'none'";
+export async function getConsentUiCsp(includePasskeyScript: boolean): Promise<string> {
+	const scriptSrc = includePasskeyScript
+		? await getPasskeyAuthScriptHash()
+		: "'none'";
+	return `default-src 'none'; script-src ${scriptSrc}; style-src 'unsafe-inline'; img-src https: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'`;
+}
 
 /**
  * Escape HTML to prevent XSS
@@ -35,6 +189,7 @@ function escapeHtml(text: string): string {
 		.replace(/"/g, "&quot;")
 		.replace(/'/g, "&#039;");
 }
+
 
 /**
  * Parse scope string into human-readable descriptions
@@ -88,6 +243,10 @@ export interface ConsentUIOptions {
 	showLogin?: boolean;
 	/** Error message to display */
 	error?: string;
+	/** Whether passkey login is available */
+	passkeyAvailable?: boolean;
+	/** WebAuthn authentication options for passkey login */
+	passkeyOptions?: Record<string, unknown>;
 }
 
 /**
@@ -96,7 +255,7 @@ export interface ConsentUIOptions {
  * @returns HTML string
  */
 export function renderConsentUI(options: ConsentUIOptions): string {
-	const { client, scope, authorizeUrl, oauthParams, userHandle, showLogin, error } = options;
+	const { client, scope, authorizeUrl, oauthParams, userHandle, showLogin, error, passkeyAvailable, passkeyOptions } = options;
 
 	const clientName = escapeHtml(client.clientName);
 	const scopeDescriptions = getScopeDescriptions(scope);
@@ -112,7 +271,14 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 		? `
 			<div class="login-form">
 				<p>Sign in to continue</p>
-				<input type="password" name="password" placeholder="Password" required autocomplete="current-password" />
+				${passkeyAvailable ? `
+				<button type="button" class="btn-passkey" id="passkey-btn">
+					<span class="passkey-icon">🔐</span>
+					Sign in with Passkey
+				</button>
+				<div class="or-divider"><span>or</span></div>
+				` : ""}
+				<input type="password" name="password" placeholder="Password" autocomplete="current-password" required />
 			</div>
 		`
 		: "";
@@ -327,6 +493,68 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 		.client-uri a:hover {
 			text-decoration: underline;
 		}
+
+		.btn-passkey {
+			width: 100%;
+			padding: 12px 20px;
+			border-radius: 8px;
+			font-size: 14px;
+			font-weight: 500;
+			cursor: pointer;
+			transition: all 0.2s;
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			background: rgba(255, 255, 255, 0.05);
+			color: #e0e0e0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+		}
+
+		.btn-passkey:hover:not(:disabled) {
+			background: rgba(255, 255, 255, 0.1);
+			border-color: #3b82f6;
+		}
+
+		.btn-passkey:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		.passkey-icon {
+			font-size: 16px;
+		}
+
+		.or-divider {
+			display: flex;
+			align-items: center;
+			margin: 16px 0;
+			color: #6b7280;
+			font-size: 12px;
+		}
+
+		.or-divider::before,
+		.or-divider::after {
+			content: "";
+			flex: 1;
+			height: 1px;
+			background: rgba(255, 255, 255, 0.1);
+		}
+
+		.or-divider span {
+			padding: 0 12px;
+		}
+
+		.passkey-status {
+			margin-top: 8px;
+			font-size: 12px;
+			text-align: center;
+			min-height: 16px;
+		}
+
+		.passkey-status.error {
+			color: #f87171;
+		}
 	</style>
 </head>
 <body>
@@ -360,6 +588,9 @@ export function renderConsentUI(options: ConsentUIOptions): string {
 
 		<p class="info">You can revoke access anytime in your account settings.</p>
 	</div>
+	${passkeyAvailable && passkeyOptions ? `
+	<script data-passkey-options="${escapeHtml(JSON.stringify(passkeyOptions))}" data-oauth-params="${escapeHtml(JSON.stringify(oauthParams))}">${PASSKEY_AUTH_SCRIPT}</script>
+	` : ""}
 </body>
 </html>`;
 }

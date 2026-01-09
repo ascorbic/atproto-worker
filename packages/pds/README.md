@@ -158,6 +158,32 @@ pds migrate --clean      # Reset and re-import
 pds activate             # Go live again
 ```
 
+### `pds passkey`
+
+Manage passkeys for passwordless authentication.
+
+```bash
+pds passkey add          # Register a new passkey
+pds passkey list         # List registered passkeys
+pds passkey remove       # Remove a passkey
+```
+
+All passkey commands support:
+
+- `--dev` – Target the local development server instead of production
+
+#### `pds passkey add`
+
+Registers a new passkey (WebAuthn credential). Displays a QR code in the terminal for easy registration from a mobile device. The registration link expires after 10 minutes.
+
+#### `pds passkey list`
+
+Lists all registered passkeys with their names, IDs, and last used timestamps.
+
+#### `pds passkey remove`
+
+Interactively select and remove a passkey from the account.
+
 ### `pds secret`
 
 Manage individual secrets.
@@ -366,6 +392,8 @@ The PDS includes a complete OAuth 2.1 provider for "Login with Bluesky":
 | `POST /oauth/authorize`                       | Process authorization decision |
 | `POST /oauth/token`                           | Token exchange                 |
 | `POST /oauth/revoke`                          | Token revocation               |
+
+**Passkey support:** The authorization page supports passwordless login via passkeys (WebAuthn). If the user has registered passkeys, a "Sign in with Passkey" button appears. This works across devices – scan a QR code from your phone to authenticate on a desktop.
 
 See the [@getcirrus/oauth-provider](../oauth-provider/) package for implementation details.
 

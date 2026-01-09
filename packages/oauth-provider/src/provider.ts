@@ -18,7 +18,7 @@ import {
 	isTokenValid,
 	AUTH_CODE_TTL,
 } from "./tokens.js";
-import { renderConsentUI, renderErrorPage, CONSENT_UI_CSP } from "./ui.js";
+import { renderConsentUI, renderErrorPage, getConsentUiCsp } from "./ui.js";
 import { authenticateClient, ClientAuthError } from "./client-auth.js";
 
 /**
@@ -39,6 +39,10 @@ export interface OAuthProviderConfig {
 	verifyUser?: (password: string) => Promise<{ sub: string; handle: string } | null>;
 	/** Get the current user (if already authenticated) */
 	getCurrentUser?: () => Promise<{ sub: string; handle: string } | null>;
+	/** Get passkey authentication options (returns null if no passkeys are registered) */
+	getPasskeyOptions?: () => Promise<Record<string, unknown> | null>;
+	/** Verify passkey authentication */
+	verifyPasskey?: (response: unknown, challenge: string) => Promise<{ sub: string; handle: string } | null>;
 }
 
 /**
@@ -111,6 +115,8 @@ export class ATProtoOAuthProvider {
 	private clientResolver: ClientResolver;
 	private verifyUser?: (password: string) => Promise<{ sub: string; handle: string } | null>;
 	private getCurrentUser?: () => Promise<{ sub: string; handle: string } | null>;
+	private getPasskeyOptions?: () => Promise<Record<string, unknown> | null>;
+	private verifyPasskey?: (response: unknown, challenge: string) => Promise<{ sub: string; handle: string } | null>;
 
 	constructor(config: OAuthProviderConfig) {
 		this.storage = config.storage;
@@ -121,6 +127,8 @@ export class ATProtoOAuthProvider {
 		this.clientResolver = config.clientResolver ?? new ClientResolver({ storage: config.storage });
 		this.verifyUser = config.verifyUser;
 		this.getCurrentUser = config.getCurrentUser;
+		this.getPasskeyOptions = config.getPasskeyOptions;
+		this.verifyPasskey = config.verifyPasskey;
 	}
 
 	/**
@@ -148,16 +156,16 @@ export class ATProtoOAuthProvider {
 
 			if (requestUri && this.enablePAR) {
 				if (!clientId) {
-					return this.renderError("invalid_request", "client_id required with request_uri");
+					return await this.renderError("invalid_request", "client_id required with request_uri");
 				}
 				const parParams = await this.parHandler.retrieveParams(requestUri, clientId);
 				if (!parParams) {
-					return this.renderError("invalid_request", "Invalid or expired request_uri");
+					return await this.renderError("invalid_request", "Invalid or expired request_uri");
 				}
 				params = parParams;
 			} else if (this.enablePAR) {
 				// PAR is required when enabled - reject direct authorization requests
-				return this.renderError(
+				return await this.renderError(
 					"invalid_request",
 					"Pushed Authorization Request required. Use the PAR endpoint first."
 				);
@@ -171,18 +179,18 @@ export class ATProtoOAuthProvider {
 		const required = ["client_id", "redirect_uri", "response_type", "code_challenge", "state"];
 		for (const param of required) {
 			if (!params[param]) {
-				return this.renderError("invalid_request", `Missing required parameter: ${param}`);
+				return await this.renderError("invalid_request", `Missing required parameter: ${param}`);
 			}
 		}
 
 		// Validate response_type
 		if (params.response_type !== "code") {
-			return this.renderError("unsupported_response_type", "Only response_type=code is supported");
+			return await this.renderError("unsupported_response_type", "Only response_type=code is supported");
 		}
 
 		// Validate code_challenge_method
 		if (params.code_challenge_method && params.code_challenge_method !== "S256") {
-			return this.renderError("invalid_request", "Only code_challenge_method=S256 is supported");
+			return await this.renderError("invalid_request", "Only code_challenge_method=S256 is supported");
 		}
 
 		// Resolve client metadata
@@ -190,12 +198,12 @@ export class ATProtoOAuthProvider {
 		try {
 			client = await this.clientResolver.resolveClient(params.client_id!);
 		} catch (e) {
-			return this.renderError("invalid_client", `Failed to resolve client: ${e}`);
+			return await this.renderError("invalid_client", `Failed to resolve client: ${e}`);
 		}
 
 		// Validate redirect_uri
 		if (!client.redirectUris.includes(params.redirect_uri!)) {
-			return this.renderError("invalid_request", "Invalid redirect_uri for this client");
+			return await this.renderError("invalid_request", "Invalid redirect_uri for this client");
 		}
 
 		// Handle POST (form submission)
@@ -209,6 +217,14 @@ export class ATProtoOAuthProvider {
 			user = await this.getCurrentUser();
 		}
 
+		// Get passkey options if user needs to log in
+		let passkeyOptions: Record<string, unknown> | null = null;
+		if (!user && this.getPasskeyOptions) {
+			passkeyOptions = await this.getPasskeyOptions();
+		}
+
+		const passkeyAvailable = !user && !!passkeyOptions;
+
 		// Show consent UI
 		const scope = params.scope ?? "atproto";
 		const html = renderConsentUI({
@@ -219,13 +235,17 @@ export class ATProtoOAuthProvider {
 			oauthParams: params,
 			userHandle: user?.handle,
 			showLogin: !user && !!this.verifyUser,
+			passkeyAvailable,
+			passkeyOptions: passkeyOptions ?? undefined,
 		});
+
+		const csp = await getConsentUiCsp(passkeyAvailable);
 
 		return new Response(html, {
 			status: 200,
 			headers: {
 				"Content-Type": "text/html; charset=utf-8",
-				"Content-Security-Policy": CONSENT_UI_CSP,
+				"Content-Security-Policy": csp,
 				"Cache-Control": "no-store",
 			},
 		});
@@ -293,11 +313,12 @@ export class ATProtoOAuthProvider {
 				showLogin: true,
 				error: "Invalid password",
 			});
+			const csp = await getConsentUiCsp(false);
 			return new Response(html, {
 				status: 401,
 				headers: {
 					"Content-Type": "text/html; charset=utf-8",
-					"Content-Security-Policy": CONSENT_UI_CSP,
+					"Content-Security-Policy": csp,
 					"Cache-Control": "no-store",
 				},
 			});
@@ -723,15 +744,122 @@ export class ATProtoOAuthProvider {
 	}
 
 	/**
+	 * Handle passkey authentication (POST /oauth/passkey-auth)
+	 *
+	 * This endpoint is called by the client-side JavaScript after a successful
+	 * WebAuthn authentication. It verifies the passkey and returns a redirect URL
+	 * to complete the OAuth authorization flow.
+	 */
+	async handlePasskeyAuth(request: Request): Promise<Response> {
+		if (!this.verifyPasskey) {
+			return oauthError("unsupported_auth_method", "Passkey authentication is not configured", 400);
+		}
+
+		let body: {
+			response: unknown;
+			challenge: string;
+			oauthParams: Record<string, string>;
+		};
+
+		try {
+			body = await request.json();
+		} catch {
+			return oauthError("invalid_request", "Invalid JSON body", 400);
+		}
+
+		const { response, challenge, oauthParams } = body;
+
+		if (!response || !challenge || !oauthParams) {
+			return oauthError("invalid_request", "Missing required parameters", 400);
+		}
+
+		// Verify the passkey
+		const user = await this.verifyPasskey(response, challenge);
+		if (!user) {
+			return new Response(JSON.stringify({ error: "Authentication failed" }), {
+				status: 401,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		// Validate OAuth params
+		const required = ["client_id", "redirect_uri", "state", "code_challenge"];
+		for (const param of required) {
+			if (!oauthParams[param]) {
+				return new Response(JSON.stringify({ error: `Missing OAuth parameter: ${param}` }), {
+					status: 400,
+					headers: { "Content-Type": "application/json" },
+				});
+			}
+		}
+
+		// Resolve client and validate redirect_uri
+		let client: ClientMetadata;
+		try {
+			client = await this.clientResolver.resolveClient(oauthParams.client_id!);
+		} catch (e) {
+			return new Response(JSON.stringify({ error: `Invalid client: ${e}` }), {
+				status: 400,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		if (!client.redirectUris.includes(oauthParams.redirect_uri!)) {
+			return new Response(JSON.stringify({ error: "Invalid redirect_uri for this client" }), {
+				status: 400,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		// Generate authorization code
+		const code = generateAuthCode();
+		const scope = oauthParams.scope ?? "atproto";
+
+		const authCodeData: AuthCodeData = {
+			clientId: oauthParams.client_id!,
+			redirectUri: oauthParams.redirect_uri!,
+			codeChallenge: oauthParams.code_challenge!,
+			codeChallengeMethod: "S256",
+			scope,
+			sub: user.sub,
+			expiresAt: Date.now() + AUTH_CODE_TTL,
+		};
+
+		await this.storage.saveAuthCode(code, authCodeData);
+
+		// Build redirect URL
+		const responseMode = oauthParams.response_mode ?? "query";
+		const redirectUrl = new URL(oauthParams.redirect_uri!);
+
+		if (responseMode === "fragment") {
+			const hashParams = new URLSearchParams();
+			hashParams.set("code", code);
+			hashParams.set("state", oauthParams.state!);
+			hashParams.set("iss", this.issuer);
+			redirectUrl.hash = hashParams.toString();
+		} else {
+			redirectUrl.searchParams.set("code", code);
+			redirectUrl.searchParams.set("state", oauthParams.state!);
+			redirectUrl.searchParams.set("iss", this.issuer);
+		}
+
+		return new Response(JSON.stringify({ redirectUrl: redirectUrl.toString() }), {
+			status: 200,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
+
+	/**
 	 * Render an error page
 	 */
-	private renderError(error: string, description: string): Response {
+	private async renderError(error: string, description: string): Promise<Response> {
 		const html = renderErrorPage(error, description);
+		const csp = await getConsentUiCsp(false);
 		return new Response(html, {
 			status: 400,
 			headers: {
 				"Content-Type": "text/html; charset=utf-8",
-				"Content-Security-Policy": CONSENT_UI_CSP,
+				"Content-Security-Policy": csp,
 				"Cache-Control": "no-store",
 			},
 		});

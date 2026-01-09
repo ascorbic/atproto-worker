@@ -793,6 +793,24 @@ export class ATProtoOAuthProvider {
 			}
 		}
 
+		// Resolve client and validate redirect_uri
+		let client: ClientMetadata;
+		try {
+			client = await this.clientResolver.resolveClient(oauthParams.client_id!);
+		} catch (e) {
+			return new Response(JSON.stringify({ error: `Invalid client: ${e}` }), {
+				status: 400,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
+		if (!client.redirectUris.includes(oauthParams.redirect_uri!)) {
+			return new Response(JSON.stringify({ error: "Invalid redirect_uri for this client" }), {
+				status: 400,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+
 		// Generate authorization code
 		const code = generateAuthCode();
 		const scope = oauthParams.scope ?? "atproto";

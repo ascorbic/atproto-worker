@@ -24,3 +24,6 @@ pnpm-debug.log*
 .idea/
 .wrangler
 .dev.vars
+
+# Signing key backups (created by pds init)
+signing-key-backup-*.txt

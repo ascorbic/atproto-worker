@@ -52,6 +52,36 @@ This is beta software under active development, but the core features are functi
 
 See the [PDS documentation](./packages/pds/) for current limitations and roadmap.
 
+## Key Safety
+
+Your signing key controls your identity. Cloudflare secrets cannot be retrieved after they're set, so backing up your key during setup is critical.
+
+### During Setup
+
+When you run `pds init`, you'll be prompted to back up your signing key. Store it somewhere safe – a password manager, encrypted backup, or similar.
+
+### Key Recovery
+
+If you've cloned to a new machine and see the "Key Recovery Required" error:
+
+1. **Restore from backup** – If you backed up your key (recommended), add it to `.dev.vars`:
+   ```
+   SIGNING_KEY=your-backed-up-key-here
+   ```
+2. **Run init again** – `pds init` will detect the local key and continue
+
+### If You've Lost Your Key
+
+**For did:web users:**
+- Generate a new key by clearing `.dev.vars` and re-running `pds init`
+- Old signatures become unverifiable – followers may see warnings
+- Your identity continues, but there's no cryptographic proof of continuity
+
+**For did:plc users:**
+- If you have a recovery key registered with PLC, you can rotate to a new signing key
+- Without a recovery key, you'll need to start a new identity
+- See the [AT Protocol PLC documentation](https://github.com/did-method-plc/did-method-plc) for recovery operations
+
 ## Requirements
 
 - Cloudflare account with R2 enabled

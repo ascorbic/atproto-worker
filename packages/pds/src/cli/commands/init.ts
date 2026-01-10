@@ -12,6 +12,7 @@ import {
 	setAccountId,
 	setCustomDomains,
 	detectCloudflareAccounts,
+	listSecrets,
 	type SecretName,
 } from "../utils/wrangler.js";
 import {
@@ -20,6 +21,8 @@ import {
 	promptSelect,
 	detectPackageManager,
 	formatCommand,
+	copyToClipboard,
+	saveKeyBackup,
 } from "../utils/cli-helpers.js";
 
 /**
@@ -165,6 +168,42 @@ export const initCommand = defineCommand({
 		// Get current config from both sources
 		const wranglerVars = getVars();
 		const devVars = readDevVars();
+
+		// Check for "freshly cloned" case: secrets exist in CF but not locally
+		// This is dangerous because we can't retrieve the values - generating new ones would break the identity
+		let cfSecrets: string[] = [];
+		try {
+			cfSecrets = await listSecrets();
+		} catch {
+			// Ignore errors - probably not logged in or no worker yet
+		}
+
+		if (cfSecrets.includes("SIGNING_KEY") && !devVars.SIGNING_KEY) {
+			p.log.error("⚠️  Signing key exists in Cloudflare but not locally!");
+			p.note(
+				[
+					"Your PDS has a signing key deployed to Cloudflare, but you don't have",
+					"a local copy in .dev.vars. This usually happens after cloning to a new",
+					"machine without restoring your key backup.",
+					"",
+					"Cloudflare secrets CANNOT be retrieved once set.",
+					"",
+					"To continue, you need to:",
+					"  1. Restore your signing key from your backup (password manager, etc.)",
+					"  2. Add it to .dev.vars as: SIGNING_KEY=your-key-here",
+					"  3. Run 'pds init' again",
+					"",
+					"If you've lost your key backup, your options are limited:",
+					"  • For did:web: Generate a new key (old signatures become unverifiable)",
+					"  • For did:plc: Use a recovery key if you have one",
+					"",
+					"See: https://github.com/ascorbic/cirrus#key-recovery",
+				].join("\n"),
+				"Key Recovery Required",
+			);
+			p.outro("Initialization cancelled.");
+			process.exit(1);
+		}
 
 		// Use wrangler vars as primary source for public config
 		const currentVars = { ...devVars, ...wranglerVars };
@@ -419,18 +458,98 @@ export const initCommand = defineCommand({
 			},
 		);
 
-		const signingKey = await getOrGenerateSecret(
-			"SIGNING_KEY",
-			devVars,
-			async () => {
-				spinner.start("Generating signing keypair...");
-				const { privateKey } = await generateSigningKeypair();
-				spinner.stop("Signing keypair generated");
-				return privateKey;
-			},
-		);
+		// Signing key is special - NEVER overwrite an existing one
+		let signingKey: string;
+		let signingKeyIsNew = false;
+
+		if (devVars.SIGNING_KEY) {
+			p.log.success("Using existing signing key from .dev.vars");
+			signingKey = devVars.SIGNING_KEY;
+		} else {
+			spinner.start("Generating signing keypair...");
+			const { privateKey } = await generateSigningKeypair();
+			spinner.stop("Signing keypair generated");
+			signingKey = privateKey;
+			signingKeyIsNew = true;
+		}
 
 		const signingKeyPublic = await derivePublicKey(signingKey);
+
+		// Show critical warning about signing key backup (only for new keys)
+		if (signingKeyIsNew) {
+			p.log.warn("⚠️  Your signing key controls your identity!");
+			p.note(
+				[
+					"This key signs all your posts and controls your account.",
+					"If you lose it, you lose your identity forever.",
+					"",
+					"Cloudflare secrets CANNOT be retrieved after being set.",
+					"Your only copy will be in .dev.vars (this directory).",
+					"",
+					"We strongly recommend backing it up now.",
+				].join("\n"),
+				"Critical: Back Up Your Signing Key",
+			);
+
+			const backupChoice = await promptSelect({
+				message: "How would you like to back up your signing key?",
+				options: [
+					{
+						value: "copy" as const,
+						label: "Copy to clipboard",
+						hint: "paste into password manager",
+					},
+					{
+						value: "file" as const,
+						label: "Save to file",
+						hint: "signing-key-backup.txt",
+					},
+					{
+						value: "show" as const,
+						label: "Display it (I'll copy manually)",
+						hint: "shown in terminal",
+					},
+					{
+						value: "skip" as const,
+						label: "Skip (I understand the risk)",
+						hint: "not recommended",
+					},
+				],
+			});
+
+			if (backupChoice === "copy") {
+				await copyToClipboard(signingKey);
+				p.log.success("Signing key copied to clipboard");
+				p.log.info("Paste it into your password manager now!");
+			} else if (backupChoice === "file") {
+				const backupPath = await saveKeyBackup(signingKey, handle);
+				p.log.success(`Signing key saved to: ${backupPath}`);
+				p.log.warn("Move this file to a secure location and delete the local copy!");
+			} else if (backupChoice === "show") {
+				p.note(
+					[
+						"SIGNING KEY (keep this secret!):",
+						"",
+						signingKey,
+						"",
+						"Copy this to your password manager now.",
+					].join("\n"),
+					"🔑 Your Signing Key",
+				);
+			}
+
+			if (backupChoice !== "skip") {
+				const confirmed = await promptConfirm({
+					message: "Have you saved your signing key securely?",
+					initialValue: true,
+				});
+				if (!confirmed) {
+					p.log.warn("Please back up your key before continuing!");
+					// Show it one more time
+					p.note(signingKey, "🔑 Signing Key");
+				}
+			}
+		}
 
 		const jwtSecret = await getOrGenerateSecret(
 			"JWT_SECRET",
@@ -477,7 +596,10 @@ export const initCommand = defineCommand({
 		}
 
 		await setSecretValue("AUTH_TOKEN", authToken, local);
-		await setSecretValue("SIGNING_KEY", signingKey, local);
+		// Only write signing key if it's new - never overwrite an existing one
+		if (signingKeyIsNew) {
+			await setSecretValue("SIGNING_KEY", signingKey, local);
+		}
 		await setSecretValue("JWT_SECRET", jwtSecret, local);
 		await setSecretValue("PASSWORD_HASH", passwordHash, local);
 
@@ -523,7 +645,10 @@ export const initCommand = defineCommand({
 			if (!p.isCancel(deployNow) && deployNow) {
 				spinner.start("Deploying secrets to Cloudflare...");
 				await setSecretValue("AUTH_TOKEN", authToken, false);
-				await setSecretValue("SIGNING_KEY", signingKey, false);
+				// Only push signing key if it's new - never overwrite an existing one
+				if (signingKeyIsNew) {
+					await setSecretValue("SIGNING_KEY", signingKey, false);
+				}
 				await setSecretValue("JWT_SECRET", jwtSecret, false);
 				await setSecretValue("PASSWORD_HASH", passwordHash, false);
 				spinner.stop("Secrets deployed to Cloudflare");

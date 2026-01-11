@@ -17,6 +17,59 @@ const REQUEST_URI_PREFIX = "urn:ietf:params:oauth:request_uri:";
 const DEFAULT_EXPIRES_IN = 90;
 
 /**
+ * Normalize a client_id for consistent comparison.
+ *
+ * For localhost client metadata URLs (used by native/public clients per AT Protocol),
+ * the client_id encodes parameters like redirect_uri and scope in the query string.
+ * Different encoding can occur between PAR POST body (form-urlencoded) and
+ * authorize request query params, causing spurious mismatches.
+ *
+ * This normalizes by:
+ * 1. Parsing as URL
+ * 2. Decoding all parameter values
+ * 3. Sorting parameters alphabetically
+ * 4. Re-encoding consistently
+ */
+function normalizeClientId(clientId: string): string {
+	try {
+		const url = new URL(clientId);
+
+		// Only normalize localhost client metadata URLs
+		if (url.hostname !== "localhost") {
+			return clientId;
+		}
+
+		// Sort params and normalize encoding
+		const params = new URLSearchParams(url.search);
+		const sortedParams = new URLSearchParams();
+
+		// Get all keys, sort them, rebuild
+		const keys = Array.from(params.keys()).sort();
+		for (const key of keys) {
+			const value = params.get(key);
+			if (value !== null) {
+				sortedParams.set(key, value);
+			}
+		}
+
+		// Remove trailing slash from pathname (http://localhost/ -> http://localhost)
+		url.pathname = url.pathname.replace(/\/$/, "") || "/";
+		// Actually, for localhost with no path, we want no trailing slash
+		if (url.pathname === "/") {
+			url.pathname = "";
+		}
+
+		url.search = sortedParams.toString();
+		const result = url.toString();
+		console.log("[PAR] normalizeClientId", { input: clientId, output: result });
+		return result;
+	} catch {
+		// If not a valid URL, return as-is
+		return clientId;
+	}
+}
+
+/**
  * OAuth error response
  */
 export interface OAuthErrorResponse {
@@ -34,7 +87,14 @@ function generateRequestUri(): string {
 /**
  * Required OAuth parameters for authorization request
  */
-const REQUIRED_PARAMS = ["client_id", "redirect_uri", "response_type", "code_challenge", "code_challenge_method", "state"];
+const REQUIRED_PARAMS = [
+	"client_id",
+	"redirect_uri",
+	"response_type",
+	"code_challenge",
+	"code_challenge_method",
+	"state",
+];
 
 /**
  * Handler for Pushed Authorization Requests (PAR)
@@ -50,7 +110,11 @@ export class PARHandler {
 	 * @param issuer The OAuth issuer URL
 	 * @param expiresIn PAR expiration time in seconds (default: 90)
 	 */
-	constructor(storage: OAuthStorage, issuer: string, expiresIn: number = DEFAULT_EXPIRES_IN) {
+	constructor(
+		storage: OAuthStorage,
+		issuer: string,
+		expiresIn: number = DEFAULT_EXPIRES_IN,
+	) {
 		this.storage = storage;
 		this.issuer = issuer;
 		this.expiresIn = expiresIn;
@@ -70,18 +134,26 @@ export class PARHandler {
 			return this.errorResponse(
 				"invalid_request",
 				e instanceof Error ? e.message : "Invalid request",
-				400
+				400,
 			);
 		}
 
 		const clientId = params.client_id;
 		if (!clientId) {
-			return this.errorResponse("invalid_request", "Missing client_id parameter", 400);
+			return this.errorResponse(
+				"invalid_request",
+				"Missing client_id parameter",
+				400,
+			);
 		}
 
 		for (const param of REQUIRED_PARAMS) {
 			if (!params[param]) {
-				return this.errorResponse("invalid_request", `Missing required parameter: ${param}`, 400);
+				return this.errorResponse(
+					"invalid_request",
+					`Missing required parameter: ${param}`,
+					400,
+				);
 			}
 		}
 
@@ -89,7 +161,7 @@ export class PARHandler {
 			return this.errorResponse(
 				"unsupported_response_type",
 				"Only response_type=code is supported",
-				400
+				400,
 			);
 		}
 
@@ -97,7 +169,7 @@ export class PARHandler {
 			return this.errorResponse(
 				"invalid_request",
 				"Only code_challenge_method=S256 is supported",
-				400
+				400,
 			);
 		}
 
@@ -106,7 +178,7 @@ export class PARHandler {
 			return this.errorResponse(
 				"invalid_request",
 				"Invalid code_challenge format",
-				400
+				400,
 			);
 		}
 
@@ -120,7 +192,7 @@ export class PARHandler {
 		const expiresAt = Date.now() + this.expiresIn * 1000;
 
 		const parData: PARData = {
-			clientId,
+			clientId: normalizeClientId(clientId),
 			params,
 			expiresAt,
 		};
@@ -150,7 +222,7 @@ export class PARHandler {
 	 */
 	async retrieveParams(
 		requestUri: string,
-		clientId: string
+		clientId: string,
 	): Promise<Record<string, string> | null> {
 		if (!requestUri.startsWith(REQUEST_URI_PREFIX)) {
 			return null;
@@ -161,7 +233,7 @@ export class PARHandler {
 			return null;
 		}
 
-		if (parData.clientId !== clientId) {
+		if (parData.clientId !== normalizeClientId(clientId)) {
 			return null;
 		}
 
@@ -184,7 +256,7 @@ export class PARHandler {
 	private errorResponse(
 		error: string,
 		description: string,
-		status: number = 400
+		status: number = 400,
 	): Response {
 		const body: OAuthErrorResponse = {
 			error,

@@ -123,16 +123,19 @@ export async function validateMigrationToken(
 
 	const [payloadB64, signatureB64] = parts as [string, string];
 
-	// Verify signature
-	const signatureBytes = fromBase64Url(signatureB64);
-	const signatureBuffer = signatureBytes.buffer.slice(signatureBytes.byteOffset, signatureBytes.byteOffset + signatureBytes.byteLength) as ArrayBuffer;
-	const isValid = await hmacVerify(payloadB64, signatureBuffer, jwtSecret);
-	if (!isValid) {
-		return null;
-	}
-
-	// Decode and validate payload
 	try {
+		// Verify signature
+		const signatureBytes = fromBase64Url(signatureB64);
+		const signatureBuffer = signatureBytes.buffer.slice(
+			signatureBytes.byteOffset,
+			signatureBytes.byteOffset + signatureBytes.byteLength,
+		) as ArrayBuffer;
+		const isValid = await hmacVerify(payloadB64, signatureBuffer, jwtSecret);
+		if (!isValid) {
+			return null;
+		}
+
+		// Decode and validate payload
 		const payloadStr = new TextDecoder().decode(fromBase64Url(payloadB64));
 		const payload: TokenPayload = JSON.parse(payloadStr);
 

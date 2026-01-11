@@ -54,9 +54,10 @@ function normalizeClientId(clientId: string): string {
 		}
 
 		// Build the normalized URL string manually
-		// (URL.toString() always adds a trailing slash for root paths)
+		// Use pathname to capture any path (URL constructor normalizes "" to "/")
 		const search = sortedParams.toString();
-		const result = `${url.protocol}//${url.host}${search ? '?' + search : ''}`;
+		const pathname = url.pathname === '/' ? '' : url.pathname;
+		const result = `${url.protocol}//${url.host}${pathname}${search ? '?' + search : ''}`;
 		console.log("[PAR] normalizeClientId", { input: clientId, output: result });
 		return result;
 	} catch {

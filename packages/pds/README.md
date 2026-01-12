@@ -343,8 +343,7 @@ The PDS uses environment variables for configuration. Public values go in `wrang
 | `HANDLE`             | Account handle                             |
 | `SIGNING_KEY_PUBLIC` | Public key for DID document (multibase)    |
 | `INITIAL_ACTIVE`     | Whether account starts active (true/false) |
-| `JURISDICTION`       | Data residency guarantee (optional)        |
-| `LOCATION_HINT`      | Placement hint for latency (optional)      |
+| `DATA_LOCATION`      | Data placement (optional, see below)       |
 
 ### Secrets
 
@@ -359,52 +358,36 @@ The PDS uses environment variables for configuration. Public values go in `wrang
 
 Cirrus supports Cloudflare's Durable Object data placement features for users who need control over where their data is stored.
 
-#### Jurisdiction (Data Residency Guarantee)
+Set `DATA_LOCATION` to control where your Durable Object is placed:
 
-Set `JURISDICTION` to ensure your data never leaves a specific region. This provides hard guarantees for compliance requirements.
+| Value  | Type         | Description                                      |
+| ------ | ------------ | ------------------------------------------------ |
+| `auto` | Default      | No location constraint (recommended)             |
+| `eu`   | Jurisdiction | European Union - hard guarantee data stays in EU |
+| `wnam` | Hint         | Western North America                            |
+| `enam` | Hint         | Eastern North America                            |
+| `sam`  | Hint         | South America                                    |
+| `weur` | Hint         | Western Europe                                   |
+| `eeur` | Hint         | Eastern Europe                                   |
+| `apac` | Hint         | Asia-Pacific                                     |
+| `oc`   | Hint         | Oceania                                          |
+| `afr`  | Hint         | Africa                                           |
+| `me`   | Hint         | Middle East                                      |
 
-| Value     | Description                        |
-| --------- | ---------------------------------- |
-| `eu`      | European Union datacenters only    |
-| `fedramp` | FedRAMP-compliant datacenters (US) |
-
-Example in `wrangler.jsonc`:
-
-```jsonc
-{
-	"vars": {
-		"JURISDICTION": "eu"
-	}
-}
-```
-
-**Important:** Jurisdiction only affects newly-created Durable Objects. If your PDS already has data, you must export the repository, create a new PDS with jurisdiction configured, and re-import.
-
-#### Location Hints (Best Effort)
-
-Set `LOCATION_HINT` to suggest where the Durable Object should be placed. This is a hint for latency optimization, not a guarantee.
-
-| Value  | Region                |
-| ------ | --------------------- |
-| `wnam` | Western North America |
-| `enam` | Eastern North America |
-| `sam`  | South America         |
-| `weur` | Western Europe        |
-| `eeur` | Eastern Europe        |
-| `apac` | Asia-Pacific          |
-| `oc`   | Oceania               |
-| `afr`  | Africa                |
-| `me`   | Middle East           |
+- **Jurisdiction** (`eu`): Hard guarantee that data never leaves the region. Use this for compliance requirements.
+- **Hints** (all others): Best-effort suggestions for initial placement. Cloudflare may place the DO elsewhere based on availability.
 
 Example in `wrangler.jsonc`:
 
 ```jsonc
 {
 	"vars": {
-		"LOCATION_HINT": "weur"
+		"DATA_LOCATION": "eu"
 	}
 }
 ```
+
+> **Warning:** Do not change `DATA_LOCATION` after initial deployment. This setting only affects newly-created Durable Objects. Changing it will NOT migrate existing data. To relocate, export your repository and re-import to a new PDS.
 
 See [Cloudflare's data location documentation](https://developers.cloudflare.com/durable-objects/reference/data-location/) for more details.
 

@@ -1,6 +1,6 @@
 // Public API
 export { AccountDurableObject } from "./account-do";
-export type { PDSEnv, Jurisdiction, LocationHint } from "./types";
+export type { PDSEnv, DataLocation } from "./types";
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -85,19 +85,23 @@ app.use(
 	}),
 );
 
-// Helper to get Account DO stub with optional jurisdiction and location hints
+// Helper to get Account DO stub with optional data location
 function getAccountDO(env: PDSEnv) {
-	// Apply jurisdiction if configured (provides hard data residency guarantees)
-	// Note: Jurisdiction only affects newly-created DOs. Existing DOs cannot be migrated.
-	const namespace = env.JURISDICTION
-		? env.ACCOUNT.jurisdiction(env.JURISDICTION)
-		: env.ACCOUNT;
+	const location = env.DATA_LOCATION;
 
-	const id = namespace.idFromName("account");
+	// "eu" is a jurisdiction (hard guarantee), everything else is a hint (best-effort)
+	if (location === "eu") {
+		const namespace = env.ACCOUNT.jurisdiction("eu");
+		return namespace.get(namespace.idFromName("account"));
+	}
 
-	// Apply location hint if configured (best-effort placement suggestion)
-	const options = env.LOCATION_HINT ? { locationHint: env.LOCATION_HINT } : undefined;
-	return namespace.get(id, options);
+	// Location hints (or "auto"/undefined = no constraint)
+	const id = env.ACCOUNT.idFromName("account");
+	if (location && location !== "auto") {
+		return env.ACCOUNT.get(id, { locationHint: location });
+	}
+
+	return env.ACCOUNT.get(id);
 }
 
 // DID document for did:web resolution

@@ -2,26 +2,37 @@ import type { AuthVariables } from "./middleware/auth";
 import type { AccountDurableObject } from "./account-do";
 
 /**
- * Jurisdiction options for Durable Object data placement.
- * These provide hard guarantees that data never leaves the specified region.
+ * Data location options for Durable Object placement.
+ *
+ * - "auto": No location constraint (default, recommended)
+ * - "eu": European Union - hard guarantee data never leaves EU
+ * - Location hints (best-effort, not guaranteed):
+ *   - "wnam": Western North America
+ *   - "enam": Eastern North America
+ *   - "sam": South America
+ *   - "weur": Western Europe
+ *   - "eeur": Eastern Europe
+ *   - "apac": Asia-Pacific
+ *   - "oc": Oceania
+ *   - "afr": Africa
+ *   - "me": Middle East
+ *
+ * IMPORTANT: This setting only affects newly-created Durable Objects.
+ * Changing this after initial deployment will NOT migrate existing data.
+ * To relocate data, you must export and re-import to a new PDS.
  */
-export type Jurisdiction = "eu" | "fedramp";
-
-/**
- * Location hint options for Durable Object placement.
- * These are best-effort suggestions for initial DO placement.
- * Unlike jurisdiction, hints are not guarantees.
- */
-export type LocationHint =
-	| "wnam" // Western North America
-	| "enam" // Eastern North America
-	| "sam" // South America
-	| "weur" // Western Europe
-	| "eeur" // Eastern Europe
-	| "apac" // Asia-Pacific
-	| "oc" // Oceania
-	| "afr" // Africa
-	| "me"; // Middle East
+export type DataLocation =
+	| "auto" // No location constraint (default)
+	| "eu" // European Union (jurisdiction - hard guarantee)
+	| "wnam" // Western North America (hint)
+	| "enam" // Eastern North America (hint)
+	| "sam" // South America (hint)
+	| "weur" // Western Europe (hint)
+	| "eeur" // Eastern Europe (hint)
+	| "apac" // Asia-Pacific (hint)
+	| "oc" // Oceania (hint)
+	| "afr" // Africa (hint)
+	| "me"; // Middle East (hint)
 
 /**
  * Environment bindings required by the PDS worker.
@@ -51,20 +62,19 @@ export interface PDSEnv {
 	/** Initial activation state for new accounts (default: true) */
 	INITIAL_ACTIVE?: string;
 	/**
-	 * Jurisdiction for Durable Object data placement.
-	 * Provides hard guarantees that data stays within the specified region.
-	 * Options: "eu" (European Union), "fedramp" (FedRAMP-compliant datacenters)
+	 * Data location for Durable Object placement.
 	 *
-	 * IMPORTANT: This only affects newly-created DOs. Existing DOs cannot be
-	 * migrated - you must export data and create a new PDS with jurisdiction set.
+	 * WARNING: DO NOT CHANGE THIS AFTER INITIAL DEPLOYMENT.
+	 * This setting only affects newly-created DOs. Changing it will NOT
+	 * migrate existing data and may cause issues.
+	 *
+	 * Options:
+	 * - "auto" or unset: No location constraint (default, recommended)
+	 * - "eu": European Union - hard guarantee data never leaves EU
+	 * - Location hints (best-effort, not guaranteed):
+	 *   "wnam", "enam", "sam", "weur", "eeur", "apac", "oc", "afr", "me"
 	 */
-	JURISDICTION?: Jurisdiction;
-	/**
-	 * Location hint for Durable Object placement.
-	 * Best-effort suggestion for where to place the DO - not a guarantee.
-	 * Options: "wnam", "enam", "sam", "weur", "eeur", "apac", "oc", "afr", "me"
-	 */
-	LOCATION_HINT?: LocationHint;
+	DATA_LOCATION?: DataLocation;
 }
 
 /**

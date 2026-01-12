@@ -343,6 +343,8 @@ The PDS uses environment variables for configuration. Public values go in `wrang
 | `HANDLE`             | Account handle                             |
 | `SIGNING_KEY_PUBLIC` | Public key for DID document (multibase)    |
 | `INITIAL_ACTIVE`     | Whether account starts active (true/false) |
+| `JURISDICTION`       | Data residency guarantee (optional)        |
+| `LOCATION_HINT`      | Placement hint for latency (optional)      |
 
 ### Secrets
 

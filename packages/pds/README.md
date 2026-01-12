@@ -355,6 +355,59 @@ The PDS uses environment variables for configuration. Public values go in `wrang
 | `JWT_SECRET`    | Secret for signing session JWTs       |
 | `PASSWORD_HASH` | Bcrypt hash of password for app login |
 
+### Data Placement
+
+Cirrus supports Cloudflare's Durable Object data placement features for users who need control over where their data is stored.
+
+#### Jurisdiction (Data Residency Guarantee)
+
+Set `JURISDICTION` to ensure your data never leaves a specific region. This provides hard guarantees for compliance requirements.
+
+| Value     | Description                        |
+| --------- | ---------------------------------- |
+| `eu`      | European Union datacenters only    |
+| `fedramp` | FedRAMP-compliant datacenters (US) |
+
+Example in `wrangler.jsonc`:
+
+```jsonc
+{
+	"vars": {
+		"JURISDICTION": "eu"
+	}
+}
+```
+
+**Important:** Jurisdiction only affects newly-created Durable Objects. If your PDS already has data, you must export the repository, create a new PDS with jurisdiction configured, and re-import.
+
+#### Location Hints (Best Effort)
+
+Set `LOCATION_HINT` to suggest where the Durable Object should be placed. This is a hint for latency optimization, not a guarantee.
+
+| Value  | Region                |
+| ------ | --------------------- |
+| `wnam` | Western North America |
+| `enam` | Eastern North America |
+| `sam`  | South America         |
+| `weur` | Western Europe        |
+| `eeur` | Eastern Europe        |
+| `apac` | Asia-Pacific          |
+| `oc`   | Oceania               |
+| `afr`  | Africa                |
+| `me`   | Middle East           |
+
+Example in `wrangler.jsonc`:
+
+```jsonc
+{
+	"vars": {
+		"LOCATION_HINT": "weur"
+	}
+}
+```
+
+See [Cloudflare's data location documentation](https://developers.cloudflare.com/durable-objects/reference/data-location/) for more details.
+
 ## API Endpoints
 
 ### Identity

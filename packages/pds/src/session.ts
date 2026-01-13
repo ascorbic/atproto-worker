@@ -26,7 +26,6 @@ export async function createAccessToken(
 	return new SignJWT({ scope: "atproto" })
 		.setProtectedHeader({ alg: "HS256", typ: "at+jwt" })
 		.setIssuedAt()
-		.setIssuer(serviceDid)
 		.setAudience(serviceDid)
 		.setSubject(userDid)
 		.setExpirationTime(ACCESS_TOKEN_LIFETIME)
@@ -47,9 +46,9 @@ export async function createRefreshToken(
 	return new SignJWT({ scope: "com.atproto.refresh", jti })
 		.setProtectedHeader({ alg: "HS256", typ: "refresh+jwt" })
 		.setIssuedAt()
-		.setIssuer(serviceDid)
 		.setAudience(serviceDid)
 		.setSubject(userDid)
+		.setJti(jti)
 		.setExpirationTime(REFRESH_TOKEN_LIFETIME)
 		.sign(secret);
 }
@@ -65,7 +64,6 @@ export async function verifyAccessToken(
 	const secret = createSecretKey(jwtSecret);
 
 	const { payload, protectedHeader } = await jwtVerify(token, secret, {
-		issuer: serviceDid,
 		audience: serviceDid,
 	});
 
@@ -93,7 +91,6 @@ export async function verifyRefreshToken(
 	const secret = createSecretKey(jwtSecret);
 
 	const { payload, protectedHeader } = await jwtVerify(token, secret, {
-		issuer: serviceDid,
 		audience: serviceDid,
 	});
 

@@ -2,10 +2,21 @@
 "@getcirrus/pds": patch
 ---
 
-Fix authentication loss after 2 hours by removing JWT issuer claim verification
+Fix authentication loss after 2 hours
 
-Removes the `iss` (issuer) claim from JWT creation and verification to match the official Bluesky PDS implementation. The official PDS only uses the `aud` (audience) claim for token verification.
+Fixes the authentication loss issue where Cirrus-hosted accounts would lose auth after ~2 hours of idle time, requiring users to switch accounts or reload the page to recover.
 
-Cirrus was being overly strict by requiring both issuer and audience claims to match during token verification. This could cause session refresh to fail after the 2-hour access token expires, resulting in authentication loss where users need to switch accounts or reload the page to recover.
+**Root Cause:**
+The Bluesky client (@atproto/api) checks for the `emailConfirmed` field in `refreshSession` responses. When missing, it makes an additional `getSession` call. If `getSession` also omits `emailConfirmed`, the client's session state becomes corrupted.
 
-This fix is backward compatible - existing tokens that contain the issuer claim will still work since we no longer verify it.
+After the 2-hour access token expires, the refresh flow would:
+1. Client calls `refreshSession` → gets incomplete response
+2. Client detects missing `emailConfirmed` and calls `getSession`
+3. `getSession` also returns incomplete data
+4. Client session state corrupts, causing auth failures
+
+**Fixes:**
+1. Added `emailConfirmed` field to `createSession`, `refreshSession`, and `getSession` responses
+2. Removed JWT `iss` (issuer) claim to match official PDS implementation (reduces unnecessary strictness)
+
+Both changes align Cirrus with the official Bluesky PDS behavior and ensure reliable session refresh.
